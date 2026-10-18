@@ -1,0 +1,6 @@
+/* Global custom styles */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+}

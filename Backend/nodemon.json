@@ -1,0 +1,13 @@
+{
+    "ignore": [
+        "node_modules",
+        ".git",
+        "public",
+        "*.test.js",
+        "fixtures"
+    ],
+    "watch": [
+        "server.js",
+        ".env"
+    ]
+}
