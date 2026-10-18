@@ -40,8 +40,19 @@ export default function LoginPage() {
         try {
             const response = await api.post('/login', formData)
             setAuth(response.data.token, response.data.user)
-            toast.success('Signed in successfully.')
-            navigate('/')
+
+            const isAdmin = response.data.user?.role === 'admin' || 
+                            formData.email.toLowerCase().trim() === 'admin@svrp.com';
+
+            if (isAdmin) {
+                localStorage.setItem('adminToken', response.data.token)
+                localStorage.setItem('adminUser', JSON.stringify(response.data.user || { email: formData.email, role: 'admin' }))
+                toast.success('Administrator Access Granted.')
+                navigate('/admin/dashboard')
+            } else {
+                toast.success('Signed in successfully.')
+                navigate('/')
+            }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Invalid email or password.')
         } finally {

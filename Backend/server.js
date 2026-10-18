@@ -283,7 +283,7 @@ app.post('/api/login', authLimiter, async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
-        const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '20m' });
+        const token = jwt.sign({ id: user._id, role: user.role || 'user' }, JWT_SECRET, { expiresIn: '20m' });
 
         // Fetch profile (JOIN) or fall back to User doc for legacy users
         let profile = await Profile.findOne({ user: user._id });
@@ -301,7 +301,8 @@ app.post('/api/login', authLimiter, async (req, res) => {
             id: user._id,
             email: user.email,
             fullname: userFullname,
-            phoneNumber: userPhone
+            phoneNumber: userPhone,
+            role: user.role || 'user'
         };
 
         // Store user in session
