@@ -80,7 +80,8 @@ export default function AdminProducts() {
             }
         })
         // Return full backend URL
-        return `http://localhost:5000${res.data.url}`
+        const backendOrigin = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://svrp-1.onrender.com/api' : 'http://localhost:5000/api')).replace(/\/api\/?$/, '');
+        return `${backendOrigin}${res.data.url}`
     }
 
     const handleImageSelect = (e) => {

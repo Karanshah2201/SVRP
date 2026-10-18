@@ -95,6 +95,9 @@ function App() {
               </Route>
             </Route>
 
+            {/* Handle static site /index.html hits */}
+            <Route path="/index.html" element={<Navigate to="/" replace />} />
+
             {/* Catch all redirect */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
