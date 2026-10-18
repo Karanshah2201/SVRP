@@ -29,19 +29,26 @@ app.use(helmet({
 }));
 
 // CORS - restrict to allowed origins
+const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map(url => url.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
 const allowedOrigins = [
-    process.env.FRONTEND_URL || 'http://localhost:5173',
+    ...configuredOrigins,
+    'http://localhost:5173',
     'http://127.0.0.1:5173'
 ];
 
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, etc) in dev
-        if (!origin && !isProduction) return callback(null, true);
-        if (allowedOrigins.includes(origin)) {
+        // Allow requests with no origin (mobile apps, curl, Render health checks)
+        if (!origin) return callback(null, true);
+        const normalizedOrigin = origin.replace(/\/$/, '');
+        if (allowedOrigins.includes(normalizedOrigin)) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            callback(new Error(`Not allowed by CORS: ${origin}`));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
