@@ -22,63 +22,26 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 const app = express();
 
-// Security headers
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow uploaded files to load cross-origin
-    contentSecurityPolicy: false // Disable CSP in dev (configure properly for production)
-}));
-
-// CORS - smart origin resolution
-const configuredOrigins = (process.env.FRONTEND_URL || '')
-    .split(',')
-    .map(url => url.trim().replace(/\/$/, ''))
-    .filter(Boolean);
-
-const allowedOrigins = [
-    ...configuredOrigins,
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:3000',
-    'http://localhost:4173'
-];
-
+// CORS - Allow all origins dynamically with credentials support
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, Render internal health checks)
-        if (!origin) return callback(null, true);
-
-        const normalizedOrigin = origin.replace(/\/$/, '');
-
-        // 1. Check explicit allowed list
-        if (allowedOrigins.includes(normalizedOrigin)) {
-            return callback(null, true);
-        }
-
-        try {
-            const parsedUrl = new URL(origin);
-            // 2. Automatically permit any Render-hosted frontend (*.onrender.com)
-            if (parsedUrl.hostname.endsWith('.onrender.com')) {
-                return callback(null, true);
-            }
-            // 3. In non-production, permit any localhost port
-            if (!isProduction && (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1')) {
-                return callback(null, true);
-            }
-        } catch {
-            // URL parse failed, reject below
-        }
-
-        callback(new Error(`Not allowed by CORS: ${origin}`));
+        // Automatically allow any origin (reflects origin header so credentials work)
+        callback(null, true);
     },
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'X-Requested-With'],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    credentials: true,
     optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle preflight requests cleanly
+
+// Security headers
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow uploaded files to load cross-origin
+    contentSecurityPolicy: false
+}));
 
 // Stripe functionality removed
 
