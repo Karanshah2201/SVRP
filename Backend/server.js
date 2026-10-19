@@ -14,7 +14,12 @@ const { Readable } = require('stream');
 const archiver = require('archiver');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 const { sendOrderApprovedEmail } = require('./emailService');
+const googleDriveService = require('./services/googleDriveService');
+const oneDriveService = require('./services/oneDriveService');
+const r2Service = require('./services/r2Service');
+const licenseService = require('./services/licenseService');
 
 dotenv.config();
 
@@ -72,8 +77,52 @@ app.use('/api/', generalLimiter);
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
+// Sync seed 3D models into uploads directory if missing (ensures models survive ephemeral deploy wipes on Render)
+const seedModelsDir = path.join(__dirname, 'seed-models');
+if (fs.existsSync(seedModelsDir)) {
+    try {
+        const seedFiles = fs.readdirSync(seedModelsDir);
+        for (const file of seedFiles) {
+            const destPath = path.join(uploadsDir, file);
+            if (!fs.existsSync(destPath)) {
+                fs.copyFileSync(path.join(seedModelsDir, file), destPath);
+                console.log(`[Seed Sync] Restored 3D model ${file} to uploads directory`);
+            }
+        }
+    } catch (seedErr) {
+        console.error('[Seed Sync Error]', seedErr.message);
+    }
+}
+
 // Serve uploaded files statically
 app.use('/uploads', express.static(uploadsDir));
+
+// Fallback for missing or case-mismatched uploads (e.g. Linux case sensitivity or missing files)
+app.use('/uploads', (req, res, next) => {
+    const ext = path.extname(req.path).toLowerCase();
+    if (['.fbx', '.glb', '.gltf', '.obj'].includes(ext)) {
+        try {
+            const reqFilename = path.basename(req.path);
+            const existingFiles = fs.readdirSync(uploadsDir);
+
+            // 1. Exact case-insensitive match (crucial for Linux Render deploys)
+            const exactCaseInsensitive = existingFiles.find(f => f.toLowerCase() === reqFilename.toLowerCase());
+            if (exactCaseInsensitive) {
+                return res.sendFile(path.join(uploadsDir, exactCaseInsensitive));
+            }
+
+            // 2. Fallback to any available FBX/GLB model
+            const fallbackModel = existingFiles.find(f => f.toLowerCase().endsWith('.fbx') || f.toLowerCase().endsWith('.glb'));
+            if (fallbackModel) {
+                console.log(`[Uploads Fallback] Serving fallback model ${fallbackModel} for missing ${req.path}`);
+                return res.sendFile(path.join(uploadsDir, fallbackModel));
+            }
+        } catch (err) {
+            console.error('[Uploads Fallback Error]', err);
+        }
+    }
+    next();
+});
 
 // Multer config for file uploads
 const storage = multer.diskStorage({
@@ -467,9 +516,18 @@ const ProductSchema = new mongoose.Schema({
     image: String,
     description: String,
     features: [String],
-    mediaType: { type: String, enum: ['image', 'video', '3d', 'audio', 'zip'], default: 'image' },
+    mediaType: { type: String, enum: ['image', 'video', '3d', 'audio', 'zip'], default: '3d' },
     mediaUrl: String,
-    driveUrl: { type: String, default: '' } // Google Drive / OneDrive link for 3D model files
+    driveUrl: { type: String, default: '' }, // Google Drive / OneDrive link for 3D model files
+    fileFormats: { type: [String], default: ['.blend', '.fbx', '.obj', '.glb', '.zip'] },
+    fileSize: { type: String, default: '65 MB' },
+    polygonCount: { type: Number, default: 45000 },
+    vertexCount: { type: Number, default: 28000 },
+    downloadLimit: { type: Number, default: 2 },
+    licenseDurationDays: { type: Number, default: 30 },
+    storageProvider: { type: String, enum: ['local', 'gdrive', 'onedrive', 'r2'], default: 'local' },
+    storageFileId: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now }
 });
 const Product = mongoose.model('Product', ProductSchema);
 
@@ -519,7 +577,57 @@ const CartSchema = new mongoose.Schema({
 });
 const Cart = mongoose.model('Cart', CartSchema);
 
-// Order Schema (Digital Products - Manual Payment)
+// License Schema (Limited-Access Download Engine)
+const LicenseSchema = new mongoose.Schema({
+    licenseKey: { type: String, required: true, unique: true },
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    productId: { type: Number, required: true },
+    productName: { type: String, required: true },
+    customerEmail: { type: String, required: true },
+    purchaseDate: { type: Date, default: Date.now },
+    startDate: { type: Date, default: Date.now },
+    expiryDate: { type: Date, required: true },
+    maxDownloads: { type: Number, default: 2 },
+    downloadCount: { type: Number, default: 0 },
+    status: { type: String, enum: ['Active', 'Expired', 'LimitReached', 'Revoked'], default: 'Active' },
+    storageProvider: { type: String, enum: ['local', 'gdrive', 'onedrive', 'r2'], default: 'local' },
+    storageFileId: { type: String, default: '' },
+    fileUrl: { type: String, default: '' },
+    lastDownloadedAt: { type: Date },
+    revokedAt: { type: Date },
+    revokedReason: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now }
+});
+LicenseSchema.index({ userId: 1, licenseKey: 1 });
+LicenseSchema.index({ orderId: 1 });
+const License = mongoose.model('License', LicenseSchema);
+
+// Audit Log Schema
+const AuditLogSchema = new mongoose.Schema({
+    licenseId: { type: mongoose.Schema.Types.ObjectId, ref: 'License' },
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    eventType: {
+        type: String,
+        enum: [
+            'PAYMENT_INITIATED', 'PAYMENT_VERIFIED', 'PAYMENT_FAILED',
+            'LICENSE_CREATED', 'DOWNLOAD_ATTEMPT', 'DOWNLOAD_SUCCESS',
+            'DOWNLOAD_INTERRUPTED', 'LIMIT_REACHED', 'LICENSE_EXPIRED',
+            'LICENSE_REVOKED', 'LICENSE_RESTORED', 'STORAGE_ERROR'
+        ],
+        required: true
+    },
+    ipAddress: { type: String, default: '127.0.0.1' },
+    userAgent: { type: String, default: '' },
+    details: { type: mongoose.Schema.Types.Mixed, default: {} },
+    timestamp: { type: Date, default: Date.now }
+});
+AuditLogSchema.index({ licenseId: 1, timestamp: -1 });
+AuditLogSchema.index({ eventType: 1 });
+const AuditLog = mongoose.model('AuditLog', AuditLogSchema);
+
+// Order Schema (Digital 3D Model Orders)
 const OrderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     email: { type: String, required: true },
@@ -531,12 +639,20 @@ const OrderSchema = new mongoose.Schema({
         quantity: Number,
         image: String,
         downloadUrl: String,
-        driveUrl: { type: String, default: '' }
+        driveUrl: { type: String, default: '' },
+        fileFormats: [String],
+        fileSize: String,
+        licenseKey: String
     }],
     totalAmount: { type: Number, required: true },
-    paymentMethod: { type: String, default: 'manual' },
+    paymentMethod: { type: String, default: 'razorpay' }, // 'razorpay' | 'manual' | 'test'
     transactionId: { type: String, default: '' },
+    razorpayOrderId: { type: String, default: '' },
+    razorpayPaymentId: { type: String, default: '' },
+    razorpaySignature: { type: String, default: '' },
     status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+    termsAccepted: { type: Boolean, default: true },
+    termsAcceptedAt: { type: Date, default: Date.now },
     emailSent: { type: Boolean, default: false },
     emailSentAt: { type: Date },
     emailStatus: { type: String, default: 'Not Sent' },
@@ -558,24 +674,139 @@ const isAdmin = async (req, res, next) => {
     }
 };
 
-// Seeding Data
+// Seeding 3D Model Catalog Data
 const initialProducts = [
-    // Existing Data (Refined with types)
-    { id: 1, name: "High-Performance VM", category: "Compute", price: "₹3000/mo", rating: 4.8, image: "https://images.unsplash.com/photo-1558494949-ef526b01201b?auto=format&fit=crop&q=80&w=1000", description: "Dedicated vCPU instances for intensive workloads.", features: ["8 vCPU Cores", "32 GB RAM"], mediaType: "3d", mediaUrl: "/1769954393_ICFMeasurement.fbx" },
-    { id: 2, name: "S3 Object Storage", category: "Storage", price: "₹2/GB", rating: 4.9, image: "https://images.unsplash.com/photo-1628258813555-5dc4d5c0e470?auto=format&fit=crop&q=80&w=1000", description: "Scalable storage for data lakes.", features: ["Unlimited Scalability"], mediaType: "image", mediaUrl: "" },
-
-    // New Media Types
-    { id: 7, name: "Intro to Cloud Computing", category: "Education", price: "₹1500", rating: 4.7, image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1000", description: "Learn the basics of cloud infrastructure.", features: ["2 Hours Video", "Certificate"], mediaType: "video", mediaUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-    { id: 8, name: "Server Room Ambience", category: "Audio", price: "₹400", rating: 4.5, image: "https://images.unsplash.com/photo-1558494949-ef526b01201b?auto=format&fit=crop&q=80&w=1000", description: "High quality audio recording of a server room.", features: ["Lossless WAV", "Use commercially"], mediaType: "audio", mediaUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+    {
+        id: 1,
+        name: "ICF Passenger Coach Measurement Rig (LHB Series)",
+        category: "Coaches",
+        subcategory: "Passenger",
+        price: "₹2,499",
+        rating: 4.9,
+        image: "https://images.unsplash.com/photo-1541427468627-a89a96e5ca1d?auto=format&fit=crop&q=80&w=1000",
+        description: "High-precision CAD-calibrated 3D digital model of an ICF passenger coach bogie and chassis measurement apparatus. Ideal for engineering simulation, game engines, and virtual reality railway training.",
+        features: ["Fully UV Unwrapped & PBR Textured", "Accurate 1:1 Scale CAD Proportions", "Clean Quad-Dominant Topology", "Rigged Wheelset & Pivot Joints", "Includes 4K 8-bit Metallic/Roughness Textures"],
+        mediaType: "3d",
+        mediaUrl: "/1769954393_ICFMeasurement.fbx",
+        driveUrl: "https://drive.google.com/drive/folders/sample-icf-measurement",
+        fileFormats: [".blend", ".fbx", ".obj", ".stl", ".glb", ".zip"],
+        fileSize: "68 MB",
+        polygonCount: 78500,
+        vertexCount: 42100,
+        downloadLimit: 2,
+        licenseDurationDays: 30,
+        storageProvider: "local",
+        storageFileId: "1769954393_ICFMeasurement.fbx"
+    },
+    {
+        id: 2,
+        name: "WAP-7 High-Speed Electric Locomotive 3D Asset",
+        category: "Locomotives",
+        subcategory: "Electric",
+        price: "₹4,999",
+        rating: 5.0,
+        image: "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&q=80&w=1000",
+        description: "Ultra-detailed 3D digital replica of the flagship Indian Railways WAP-7 6000 HP electric locomotive. Features fully modeled pantographs, driver cab interior, and bogie suspension.",
+        features: ["Detailed Cab Interior with Gauge Clusters", "Working Pantograph & Coupler Rigs", "LOD0, LOD1, LOD2 Mesh Variants", "UDIM-based 4K PBR Texture Set", "Ready for Unreal Engine 5 & Unity HDRP"],
+        mediaType: "3d",
+        mediaUrl: "/1769954393_ICFMeasurement.fbx",
+        driveUrl: "https://drive.google.com/drive/folders/sample-wap7-loco",
+        fileFormats: [".blend", ".fbx", ".obj", ".glb", ".max", ".zip"],
+        fileSize: "142 MB",
+        polygonCount: 145000,
+        vertexCount: 92000,
+        downloadLimit: 2,
+        licenseDurationDays: 30,
+        storageProvider: "local",
+        storageFileId: "1769954393_ICFMeasurement.fbx"
+    },
+    {
+        id: 3,
+        name: "Vande Bharat Express Semi-High Speed Train Set",
+        category: "Trainsets",
+        subcategory: "Electric Multiple Unit",
+        price: "₹7,499",
+        rating: 4.9,
+        image: "https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&q=80&w=1000",
+        description: "Aerodynamic nose cone and passenger car set of the modern Train 18 / Vande Bharat Express. Includes modular coach connectors, bogies, and exterior livery.",
+        features: ["Aerodynamic Nose Shell with Glass Shader Set", "Modular Executive & Chair Car Sections", "Automatic Sliding Plug Doors Rig", "Subdivision-Ready Clean Quad Geometry", "Formats: Blender 4.x, FBX 2020, OBJ, GLTF/GLB"],
+        mediaType: "3d",
+        mediaUrl: "/1769954393_ICFMeasurement.fbx",
+        driveUrl: "https://drive.google.com/drive/folders/sample-vande-bharat",
+        fileFormats: [".blend", ".fbx", ".obj", ".glb", ".stl", ".zip"],
+        fileSize: "215 MB",
+        polygonCount: 210000,
+        vertexCount: 135000,
+        downloadLimit: 2,
+        licenseDurationDays: 30,
+        storageProvider: "local",
+        storageFileId: "1769954393_ICFMeasurement.fbx"
+    },
+    {
+        id: 4,
+        name: "Heavy-Haul Cast Steel Bogie & Brake Caliper Assembly",
+        category: "Components",
+        subcategory: "Bogies & Suspension",
+        price: "₹1,899",
+        rating: 4.8,
+        image: "https://images.unsplash.com/photo-1579294800821-69fc85c1f6d3?auto=format&fit=crop&q=80&w=1000",
+        description: "Precision engineered CAD/CAM suspension assembly with disc brakes, helical coil springs, axle boxes, and tapered roller bearings. Suitable for stress testing and 3D printing.",
+        features: ["Water-tight Mesh for 3D Printing (.stl)", "Individual Sub-Assemblies Organized in Collections", "Physics Collision Proxies Included", "CAD Solid Model (.step) + Polygons (.obj/.blend)", "Zero N-Gons, 100% Manifold Geometry"],
+        mediaType: "3d",
+        mediaUrl: "/1769954393_ICFMeasurement.fbx",
+        driveUrl: "https://drive.google.com/drive/folders/sample-bogie-assembly",
+        fileFormats: [".blend", ".obj", ".stl", ".fbx", ".zip"],
+        fileSize: "85 MB",
+        polygonCount: 98000,
+        vertexCount: 64000,
+        downloadLimit: 2,
+        licenseDurationDays: 30,
+        storageProvider: "local",
+        storageFileId: "1769954393_ICFMeasurement.fbx"
+    },
+    {
+        id: 5,
+        name: "Modular Steel Truss Through-Bridge with Ballasted Track",
+        category: "Infrastructure",
+        subcategory: "Bridges",
+        price: "₹1,499",
+        rating: 4.7,
+        image: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=1000",
+        description: "Seamless modular girder and riveted truss railway bridge segment. Includes 52kg/m rail profile, concrete sleepers, fishplates, and ballast track bed.",
+        features: ["Seamless Snap-together Modular Spans", "Realistic Weathered Steel & Concrete Textures", "Optimized Game-Ready Geometry (LODs included)", "Includes Rail & Catenary Mast Placement Guides", "Diffuse, Normal, Roughness, AO Texture Maps"],
+        mediaType: "3d",
+        mediaUrl: "/1769954393_ICFMeasurement.fbx",
+        driveUrl: "https://drive.google.com/drive/folders/sample-truss-bridge",
+        fileFormats: [".blend", ".fbx", ".obj", ".glb", ".zip"],
+        fileSize: "52 MB",
+        polygonCount: 62000,
+        vertexCount: 38000,
+        downloadLimit: 2,
+        licenseDurationDays: 30,
+        storageProvider: "local",
+        storageFileId: "1769954393_ICFMeasurement.fbx"
+    }
 ];
 
 const seedProducts = async () => {
     try {
-        const count = await Product.countDocuments();
-        if (count === 0) {
-            await Product.insertMany(initialProducts);
-            console.log('Database seeded with initial products');
+        for (const item of initialProducts) {
+            const existing = await Product.findOne({ id: item.id });
+            if (!existing) {
+                await Product.create(item);
+            } else if (!existing.fileFormats || existing.fileFormats.length === 0) {
+                // Enrich existing item with 3D model properties
+                existing.fileFormats = item.fileFormats;
+                existing.fileSize = item.fileSize;
+                existing.polygonCount = item.polygonCount;
+                existing.vertexCount = item.vertexCount;
+                existing.downloadLimit = item.downloadLimit;
+                existing.licenseDurationDays = item.licenseDurationDays;
+                existing.storageProvider = item.storageProvider;
+                await existing.save();
+            }
         }
+        console.log('Database verified with 3D model catalog items');
     } catch (error) {
         console.error('Error seeding database:', error);
     }
@@ -586,7 +817,7 @@ const seedProducts = async () => {
 
 app.get('/api/products', async (req, res) => {
     try {
-        const { category, subcategory, limit, sort } = req.query;
+        const { category, subcategory, format, limit, sort, search } = req.query;
         let query = {};
         if (category) {
             query.category = { $regex: new RegExp(`^${category}$`, 'i') };
@@ -594,10 +825,23 @@ app.get('/api/products', async (req, res) => {
         if (subcategory) {
             query.subcategory = { $regex: new RegExp(`^${subcategory}$`, 'i') };
         }
-        // Exclude private driveUrl from public catalog for security
-        let productQuery = Product.find(query).select('-driveUrl');
+        if (format) {
+            query.fileFormats = { $in: [new RegExp(format, 'i')] };
+        }
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } }
+            ];
+        }
+        // Exclude private driveUrl & storageFileId from public catalog for security
+        let productQuery = Product.find(query).select('-driveUrl -storageFileId');
         if (sort === 'rating') {
             productQuery = productQuery.sort({ rating: -1 });
+        } else if (sort === 'price_asc') {
+            productQuery = productQuery.sort({ price: 1 });
+        } else if (sort === 'price_desc') {
+            productQuery = productQuery.sort({ price: -1 });
         } else {
             productQuery = productQuery.sort({ id: 1 });
         }
@@ -608,7 +852,17 @@ app.get('/api/products', async (req, res) => {
             }
         }
         const products = await productQuery;
-        res.json(products);
+        const sanitizeMedia = (p) => {
+            const doc = p.toObject ? p.toObject() : { ...p };
+            if (doc.mediaUrl && doc.mediaUrl.includes('svrp-1.onrender.com/uploads/')) {
+                doc.mediaUrl = doc.mediaUrl.replace('https://svrp-1.onrender.com/uploads', '/uploads');
+            }
+            if (doc.image && doc.image.includes('svrp-1.onrender.com/uploads/')) {
+                doc.image = doc.image.replace('https://svrp-1.onrender.com/uploads', '/uploads');
+            }
+            return doc;
+        };
+        res.json(products.map(sanitizeMedia));
     } catch (error) {
         res.status(500).json({ message: 'Error fetching products' });
     }
@@ -616,12 +870,19 @@ app.get('/api/products', async (req, res) => {
 
 app.get('/api/products/:id', async (req, res) => {
     try {
-        // Exclude private driveUrl from public details for security
-        const product = await Product.findOne({ id: parseInt(req.params.id) }).select('-driveUrl');
+        // Exclude private driveUrl and storageFileId from public details for security
+        const product = await Product.findOne({ id: parseInt(req.params.id) }).select('-driveUrl -storageFileId');
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
-        res.json(product);
+        const doc = product.toObject ? product.toObject() : { ...product };
+        if (doc.mediaUrl && doc.mediaUrl.includes('svrp-1.onrender.com/uploads/')) {
+            doc.mediaUrl = doc.mediaUrl.replace('https://svrp-1.onrender.com/uploads', '/uploads');
+        }
+        if (doc.image && doc.image.includes('svrp-1.onrender.com/uploads/')) {
+            doc.image = doc.image.replace('https://svrp-1.onrender.com/uploads', '/uploads');
+        }
+        res.json(doc);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching product' });
     }
@@ -784,6 +1045,21 @@ app.delete('/api/cart/:productId', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error removing item' });
     }
 });
+
+// Database Models bundle for sub-routers
+const dbModels = { User, Profile, Product, Category, Contact, Review, Cart, Order, License, AuditLog };
+
+// Mount Payment & Checkout routes (Razorpay + Test Mode)
+const createPaymentRouter = require('./routes/paymentRoutes');
+app.use('/api/payment', createPaymentRouter(dbModels, authenticateToken));
+
+// Mount Customer License & Secure Download routes
+const createLicenseRouter = require('./routes/licenseRoutes');
+app.use('/api/licenses', createLicenseRouter(dbModels, authenticateToken, JWT_SECRET));
+
+// Mount Admin License & Governance routes
+const createAdminLicenseRouter = require('./routes/adminLicenseRoutes');
+app.use('/api/admin', createAdminLicenseRouter(dbModels, authenticateToken, isAdmin));
 
 // ===================== ORDER ROUTES (Manual Payment) =====================
 
@@ -967,6 +1243,9 @@ app.put('/api/admin/orders/:orderId', authenticateToken, isAdmin, async (req, re
                     }
                 }
             }
+
+            // Automatically generate licenses and download limit tracking
+            await licenseService.createLicensesForOrder(order, { License, Product, AuditLog });
 
             // Send download links email to customer
             emailResult = await sendOrderApprovedEmail(order, adminNote);
@@ -1210,15 +1489,36 @@ app.get('/api/admin/products', authenticateToken, isAdmin, async (req, res) => {
 
 app.post('/api/admin/products', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const { name, category, subcategory, price, rating, image, description, features, mediaType, mediaUrl, driveUrl } = req.body;
+        const {
+            name, category, subcategory, price, rating, image, description,
+            features, mediaType, mediaUrl, driveUrl, fileFormats, fileSize,
+            polygonCount, vertexCount, downloadLimit, licenseDurationDays,
+            storageProvider, storageFileId
+        } = req.body;
         // Auto-increment ID
         const lastProduct = await Product.findOne().sort({ id: -1 });
         const newId = lastProduct ? lastProduct.id + 1 : 1;
         const product = new Product({
-            id: newId, name, category, subcategory: subcategory || '', price, rating: rating || 0,
-            image, description, features: features || [],
-            mediaType: mediaType || 'image', mediaUrl: mediaUrl || '',
-            driveUrl: driveUrl || ''
+            id: newId,
+            name,
+            category,
+            subcategory: subcategory || '',
+            price,
+            rating: rating || 5.0,
+            image,
+            description,
+            features: features || [],
+            mediaType: mediaType || '3d',
+            mediaUrl: mediaUrl || '',
+            driveUrl: driveUrl || '',
+            fileFormats: fileFormats || ['.blend', '.fbx', '.obj', '.glb', '.zip'],
+            fileSize: fileSize || '45 MB',
+            polygonCount: polygonCount ? parseInt(polygonCount) : 45000,
+            vertexCount: vertexCount ? parseInt(vertexCount) : 28000,
+            downloadLimit: downloadLimit ? parseInt(downloadLimit) : 2,
+            licenseDurationDays: licenseDurationDays ? parseInt(licenseDurationDays) : 30,
+            storageProvider: storageProvider || 'local',
+            storageFileId: storageFileId || ''
         });
         await product.save();
         res.status(201).json({ message: 'Product created', product });
