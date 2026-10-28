@@ -39,7 +39,7 @@ export default function ContactPage() {
                 <Navbar />
 
                 {/* Section 1: Intro & Quick Info - Light Theme */}
-                <StackingSection id="contact-intro" className="z-10 bg-background pt-20">
+                <StackingSection id="contact-intro" className="bg-background pt-32 sm:pt-40">
                     <div className="relative h-full flex flex-col justify-center max-w-7xl mx-auto px-6">
                         {/* Background Blobs - Animated like Landing */}
                         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -244,9 +244,7 @@ export default function ContactPage() {
                 </StackingSection>
 
                 {/* Section 3: Footer */}
-                <div className="relative z-30 bg-background w-full">
-                    <Footer />
-                </div>
+                <Footer />
             </div>
         </SmoothScroll>
     )

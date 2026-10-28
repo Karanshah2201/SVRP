@@ -9,6 +9,8 @@ import Navbar from '../components/Navbar'
 import SmoothScroll from '../components/animations/SmoothScroll'
 import Footer from '../components/Footer'
 
+import { PageHeader } from '@/components/ui'
+
 export default function ProfilePage() {
     const navigate = useNavigate()
     const [isLoading, setIsLoading] = useState(false)
@@ -82,26 +84,22 @@ export default function ProfilePage() {
             <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20 selection:text-primary flex flex-col">
                 <Navbar />
 
-                <main className="pt-36 pb-20 px-6 max-w-2xl mx-auto flex-grow w-full">
-                    <div className="flex items-center justify-between mb-8">
-                        <Link 
-                            to="/products" 
-                            className="inline-flex items-center gap-2 text-primary/60 hover:text-primary transition-colors text-xs font-bold uppercase tracking-wider group"
-                        >
-                            <div className="w-8 h-8 skeuo-card bg-white flex items-center justify-center group-hover:-translate-x-1 transition-transform border border-border/50 shadow-sm rounded-lg">
-                                <ArrowLeft size={16} />
-                            </div>
-                            Back to Products
-                        </Link>
-
-                        <Link
-                            to="/orders"
-                            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-xs font-bold uppercase tracking-wider shadow-2xs"
-                        >
-                            <ShoppingBag size={14} />
-                            <span>My Orders</span>
-                        </Link>
-                    </div>
+                <main id="main-content" className="page-container-profile">
+                    <PageHeader
+                        backTo="/products"
+                        backLabel="Back to Products"
+                        title="Account Settings"
+                        subtitle="Manage your personal information, contact details, and account security."
+                        actions={
+                            <Link
+                                to="/orders"
+                                className="skeuo-button skeuo-button-outline flex items-center gap-2 text-xs font-bold rounded-xl"
+                            >
+                                <ShoppingBag size={14} />
+                                <span>My Orders</span>
+                            </Link>
+                        }
+                    />
 
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}

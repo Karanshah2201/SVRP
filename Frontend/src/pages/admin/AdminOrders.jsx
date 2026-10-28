@@ -3,6 +3,7 @@ import { CheckCircle, XCircle, Clock, Loader2, Package, Hash, Mail, Phone, Searc
 import api from '@/lib/api'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { StatusBadge, EmptyState } from '@/components/ui'
 
 export default function AdminOrders() {
     const [orders, setOrders] = useState([])
@@ -60,6 +61,40 @@ export default function AdminOrders() {
             toast.error(err.response?.data?.message || 'Failed to resend email')
         } finally {
             setResending(null)
+        }
+    }
+
+    const [grantActionLoading, setGrantActionLoading] = useState(null)
+
+    const handleRevokeGrant = async (grantId) => {
+        setGrantActionLoading(grantId)
+        try {
+            const res = await api.post(`/access/admin/grants/${grantId}/revoke`, {
+                reason: 'Immediate manual revocation from Admin Orders console'
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            toast.success(res.data?.message || 'Access revoked successfully!')
+            fetchOrders()
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to revoke access')
+        } finally {
+            setGrantActionLoading(null)
+        }
+    }
+
+    const handleRetryGrant = async (grantId) => {
+        setGrantActionLoading(grantId)
+        try {
+            const res = await api.post(`/access/admin/grants/${grantId}/retry`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            toast.success(res.data?.message || 'Retry succeeded! Access revoked.')
+            fetchOrders()
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Retry failed')
+        } finally {
+            setGrantActionLoading(null)
         }
     }
 
@@ -178,16 +213,14 @@ export default function AdminOrders() {
 
             {/* Orders List */}
             {filteredOrders.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-2xl border border-border border-dashed">
-                    <Package size={44} className="text-muted-foreground/40 mx-auto mb-3" />
-                    <p className="text-muted-foreground font-medium text-sm">No orders found.</p>
-                </div>
+                <EmptyState
+                    icon={Package}
+                    title="No Orders Found"
+                    description="No customer orders match the current filter and search query."
+                />
             ) : (
                 <div className="space-y-4">
                     {filteredOrders.map((order, index) => {
-                        const statusConfig = getStatusConfig(order.status)
-                        const StatusIcon = statusConfig.icon
-
                         return (
                             <motion.div
                                 key={order._id}
@@ -201,10 +234,7 @@ export default function AdminOrders() {
                                 <div className="px-5 py-3.5 border-b border-border/60 flex flex-wrap items-center justify-between gap-3 bg-muted/25">
                                     <div className="flex items-center gap-3">
                                         <span className="text-xs font-mono font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-md">#{order._id.slice(-8).toUpperCase()}</span>
-                                        <div className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${statusConfig.bg} ${statusConfig.color} border ${statusConfig.border}`}>
-                                            <StatusIcon size={12} strokeWidth={2.5} />
-                                            {order.status}
-                                        </div>
+                                        <StatusBadge status={order.status} size="sm" />
                                     </div>
                                     <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                                         <Clock size={12} />
@@ -296,6 +326,63 @@ export default function AdminOrders() {
                                                                 <Edit2 size={10} /> {item.driveUrl ? 'Edit Link' : 'Attach Link'}
                                                             </button>
                                                         </div>
+
+                                                        {/* 48-Hour Cloud Access Status & Governance */}
+                                                        {item.accessGrant && (
+                                                            <div className="mt-2 pt-2 border-t border-border/70 flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-50/90 p-2.5 rounded-lg">
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="font-bold text-[11px] text-foreground">48h Cloud Access:</span>
+                                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                                                                            item.accessGrant.status === 'active' && !item.accessGrant.isExpired
+                                                                                ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20'
+                                                                                : item.accessGrant.status === 'revoked'
+                                                                                ? 'bg-red-500/10 text-red-700 border border-red-500/20'
+                                                                                : item.accessGrant.status === 'failed'
+                                                                                ? 'bg-destructive text-white'
+                                                                                : 'bg-slate-200 text-slate-700'
+                                                                        }`}>
+                                                                            {item.accessGrant.status}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-muted-foreground uppercase font-mono">({item.accessGrant.storageProvider})</span>
+                                                                    </div>
+                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                        Expires: {formatDate(item.accessGrant.expiresAt)}
+                                                                        {item.accessGrant.revokedAt && ` • Revoked at ${formatDate(item.accessGrant.revokedAt)}`}
+                                                                    </span>
+                                                                    {item.accessGrant.lastRevocationError && (
+                                                                        <span className="text-[10px] text-red-600 font-mono">Error: {item.accessGrant.lastRevocationError}</span>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex items-center gap-1.5">
+                                                                    {item.accessGrant.status === 'active' && !item.accessGrant.isExpired && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleRevokeGrant(item.accessGrant.id)}
+                                                                            disabled={grantActionLoading === item.accessGrant.id}
+                                                                            className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-destructive/10 text-destructive hover:bg-destructive hover:text-white border border-destructive/20 transition-all flex items-center gap-1"
+                                                                            title="Revoke customer permission immediately (never deletes original cloud file)"
+                                                                        >
+                                                                            {grantActionLoading === item.accessGrant.id ? <Loader2 size={11} className="animate-spin" /> : <XCircle size={11} />}
+                                                                            Revoke Access Now
+                                                                        </button>
+                                                                    )}
+
+                                                                    {item.accessGrant.status === 'failed' && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleRetryGrant(item.accessGrant.id)}
+                                                                            disabled={grantActionLoading === item.accessGrant.id}
+                                                                            className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-500 text-white hover:bg-amber-600 transition-all flex items-center gap-1"
+                                                                        >
+                                                                            {grantActionLoading === item.accessGrant.id ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                                                                            Retry Revocation
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

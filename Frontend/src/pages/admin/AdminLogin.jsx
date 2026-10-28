@@ -35,7 +35,10 @@ export default function AdminLogin() {
         e.preventDefault()
         setIsLoading(true)
         try {
-            const response = await api.post('/admin/login', { email, password })
+            const response = await api.post('/admin/login', { 
+                email: email.trim().toLowerCase(), 
+                password 
+            })
             localStorage.setItem('adminToken', response.data.token)
             localStorage.setItem('adminUser', JSON.stringify(response.data.user))
             toast.success('Administrator Access Verified.')
@@ -70,7 +73,7 @@ export default function AdminLogin() {
                     >
                         <img src="/svrp.png" alt="SVRP" className="h-10 w-auto" />
                     </motion.div>
-                    <p className="text-[11px] font-mono font-bold text-primary/80 uppercase tracking-[0.2em]">Institutional Admin Portal</p>
+                    <p className="text-[11px] font-mono font-bold text-primary/80 uppercase tracking-[0.2em]">Shri Vishwakarma Rail Production</p>
                 </motion.div>
 
                 {/* Secure Form Card */}

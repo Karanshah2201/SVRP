@@ -98,6 +98,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: #ffffff;
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -223,6 +225,75 @@
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+
+  .page-container {
+    @apply pt-32 sm:pt-36 pb-20 sm:pb-24 px-4 sm:px-6 max-w-7xl mx-auto flex-grow w-full;
+  }
+
+  .page-container-narrow {
+    @apply pt-32 sm:pt-36 pb-20 sm:pb-24 px-4 sm:px-6 max-w-4xl mx-auto flex-grow w-full;
+  }
+
+  .page-container-profile {
+    @apply pt-32 sm:pt-36 pb-20 sm:pb-24 px-4 sm:px-6 max-w-2xl mx-auto flex-grow w-full;
+  }
+
+  .page-header-title {
+    @apply text-2xl sm:text-3xl md:text-4xl font-black text-primary tracking-tight leading-tight;
+  }
+
+  .page-header-subtitle {
+    @apply text-xs sm:text-sm text-muted-foreground font-medium mt-1.5 max-w-2xl leading-relaxed;
+  }
+
+  .page-back-link {
+    @apply inline-flex items-center gap-2 text-primary/70 hover:text-primary transition-colors text-xs font-bold uppercase tracking-wider mb-6 cursor-pointer select-none;
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ring-offset-background;
+  }
+
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-primary focus:text-white focus:rounded-xl focus:shadow-lg focus:font-bold focus:text-xs;
+  }
+
+  /* Standardized Status Badges */
+  .badge-status {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors shadow-xs shrink-0 select-none;
+  }
+  .badge-success {
+    @apply bg-emerald-500/10 text-emerald-800 border-emerald-500/20;
+  }
+  .badge-warning {
+    @apply bg-amber-500/10 text-amber-800 border-amber-500/20;
+  }
+  .badge-danger {
+    @apply bg-rose-500/10 text-rose-800 border-rose-500/25;
+  }
+  .badge-info {
+    @apply bg-primary/10 text-primary border-primary/20;
+  }
+  .badge-neutral {
+    @apply bg-slate-100 text-slate-700 border-slate-200;
+  }
+
+  /* Admin System Helpers */
+  .admin-card {
+    @apply bg-white border border-border/80 rounded-2xl shadow-xs transition-all duration-200;
+  }
+
+  .admin-table-container {
+    @apply bg-white border border-border/80 rounded-2xl overflow-hidden shadow-xs;
+  }
+
+  .admin-table-header {
+    @apply text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5 bg-muted/40 border-b border-border/80 select-none;
+  }
+
+  .admin-table-cell {
+    @apply px-5 py-4 text-xs font-medium text-foreground align-middle;
   }
 
   .mask-fade-bottom {

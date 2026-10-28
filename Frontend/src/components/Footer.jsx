@@ -42,7 +42,7 @@ export default function Footer() {
                             </motion.div>
                             <div className="flex flex-col">
                                 <span className="text-primary font-black text-xl tracking-tight uppercase leading-none">SVRP</span>
-                                <span className="text-[11px] font-mono font-black text-secondary tracking-[0.2em] leading-none mt-1">RAIL WORKS</span>
+                                <span className="text-[11px] font-mono font-black text-secondary tracking-[0.2em] leading-none mt-1">RAIL PRODUCTION</span>
                             </div>
                         </Link>
                         <p className="text-muted-foreground text-sm font-medium leading-relaxed mb-8">
@@ -78,11 +78,14 @@ export default function Footer() {
                         </h4>
                         <ul className="space-y-3.5">
                             {[
-                                { label: 'Asset Catalog', path: '/products' },
+                                { label: '3D Asset Catalog', path: '/products' },
+                                { label: 'My Licenses & Limits', path: '/licenses' },
+                                { label: 'Orders & Downloads', path: '/orders' },
+                                { label: 'License Terms (EULA)', path: '/terms' },
+                                { label: 'Copy Disclaimer', path: '/disclaimer' },
+                                { label: 'Refund Policy', path: '/refund-policy' },
                                 { label: 'About SVRP', path: '/about' },
-                                { label: 'Support & Inquiries', path: '/contact' },
-                                { label: 'Orders & Shipments', path: '/orders' },
-                                { label: 'User Console', path: '/profile' }
+                                { label: 'Support & Inquiries', path: '/contact' }
                             ].map((item) => (
                                 <li key={item.label}>
                                     <Link 
@@ -109,7 +112,7 @@ export default function Footer() {
                                 </div>
                                 <div>
                                     <p className="text-[11px] text-muted-foreground font-black uppercase tracking-widest leading-none mb-1.5 font-mono">Main Channel</p>
-                                    <a href="mailto:contact@svrp.rail" className="text-sm font-bold text-primary hover:text-secondary transition-colors">contact@svrp.rail</a>
+                                    <a href="mailto:support@railworks.com" className="text-sm font-bold text-primary hover:text-secondary transition-colors">support@railworks.com</a>
                                 </div>
                             </li>
                             <li className="flex items-start gap-3.5">
@@ -157,15 +160,21 @@ export default function Footer() {
                     <div className="flex items-center gap-3">
                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                         <p className="text-[11px] text-muted-foreground font-bold uppercase tracking-[0.2em] font-mono">
-                            © 2026 SVRP RAIL WORKS PRODUCTION [INSTITUTIONAL]
+                            © 2026 SHRI VISHWAKARMA RAIL PRODUCTION (SVRP) [INSTITUTIONAL]
                         </p>
                     </div>
-                    <div className="flex items-center gap-8">
-                        <Link to="/about" className="text-[11px] text-muted-foreground hover:text-primary font-bold uppercase tracking-widest transition-colors font-mono">
-                            Privacy Protocol
+                    <div className="flex flex-wrap items-center gap-6">
+                        <Link to="/terms" className="text-[11px] text-muted-foreground hover:text-primary font-bold uppercase tracking-widest transition-colors font-mono">
+                            Terms of Service
                         </Link>
-                        <Link to="/about" className="text-[11px] text-muted-foreground hover:text-primary font-bold uppercase tracking-widest transition-colors font-mono">
-                            Terms of Use
+                        <Link to="/disclaimer" className="text-[11px] text-muted-foreground hover:text-primary font-bold uppercase tracking-widest transition-colors font-mono">
+                            Disclaimer
+                        </Link>
+                        <Link to="/privacy" className="text-[11px] text-muted-foreground hover:text-primary font-bold uppercase tracking-widest transition-colors font-mono">
+                            Privacy Policy
+                        </Link>
+                        <Link to="/refund-policy" className="text-[11px] text-muted-foreground hover:text-primary font-bold uppercase tracking-widest transition-colors font-mono">
+                            Refunds
                         </Link>
                         <Link to="/contact" className="text-[11px] text-muted-foreground hover:text-primary font-bold uppercase tracking-widest transition-colors font-mono">
                             Support

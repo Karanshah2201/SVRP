@@ -64,7 +64,7 @@ const authLimiter = rateLimit({
 
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100, // 100 requests per 15 min
+    max: isProduction ? 100 : 5000, // 5000 requests in dev to prevent Vite HMR / reload throttling
     message: { message: 'Too many requests. Please slow down.' },
     standardHeaders: true,
     legacyHeaders: false
@@ -261,7 +261,7 @@ const authenticateToken = (req, res, next) => {
 
 // Routes
 app.get('/', (req, res) => {
-    res.json({ message: 'Rail Works API is running' });
+    res.json({ message: 'Shri Vishwakarma Rail Production API is running' });
 });
 
 app.post('/api/register', authLimiter, async (req, res) => {
@@ -614,7 +614,9 @@ const AuditLogSchema = new mongoose.Schema({
             'PAYMENT_INITIATED', 'PAYMENT_VERIFIED', 'PAYMENT_FAILED',
             'LICENSE_CREATED', 'DOWNLOAD_ATTEMPT', 'DOWNLOAD_SUCCESS',
             'DOWNLOAD_INTERRUPTED', 'LIMIT_REACHED', 'LICENSE_EXPIRED',
-            'LICENSE_REVOKED', 'LICENSE_RESTORED', 'STORAGE_ERROR'
+            'LICENSE_REVOKED', 'LICENSE_RESTORED', 'STORAGE_ERROR',
+            'ACCESS_GRANTED', 'ACCESS_REVOKED', 'ACCESS_REVOCATION_FAILED', 'ACCESS_REVOCATION_RETRY',
+            'CLOUD_LINK_ACCESSED'
         ],
         required: true
     },
@@ -626,6 +628,38 @@ const AuditLogSchema = new mongoose.Schema({
 AuditLogSchema.index({ licenseId: 1, timestamp: -1 });
 AuditLogSchema.index({ eventType: 1 });
 const AuditLog = mongoose.model('AuditLog', AuditLogSchema);
+
+// 48-Hour Automatic Cloud Access Grant Schema (Google Drive & Microsoft OneDrive)
+const AccessGrantSchema = new mongoose.Schema({
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true, index: true },
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    customerEmail: { type: String, required: true },
+    productId: { type: Number, required: true },
+    productName: { type: String, default: '' },
+    storageProvider: { type: String, enum: ['gdrive', 'onedrive', 'local', 'r2'], default: 'gdrive' },
+    storageFileId: { type: String, required: true },
+    permissionId: { type: String, default: '' },
+    sharingLinkId: { type: String, default: '' },
+    accessLink: { type: String, default: '' },
+    accessGrantedAt: { type: Date, default: Date.now },
+    expiresAt: { type: Date, required: true, index: true },
+    status: {
+        type: String,
+        enum: ['pending', 'active', 'revoking', 'revoked', 'expired', 'failed'],
+        default: 'active',
+        index: true
+    },
+    revocationAttempts: { type: Number, default: 0 },
+    lastRevocationError: { type: String, default: '' },
+    revokedAt: { type: Date },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+AccessGrantSchema.index({ orderId: 1, productId: 1 }, { unique: true });
+AccessGrantSchema.index({ status: 1, expiresAt: 1 });
+AccessGrantSchema.index({ customerId: 1, createdAt: -1 });
+const AccessGrant = mongoose.model('AccessGrant', AccessGrantSchema);
 
 // Order Schema (Digital 3D Model Orders)
 const OrderSchema = new mongoose.Schema({
@@ -1047,7 +1081,11 @@ app.delete('/api/cart/:productId', authenticateToken, async (req, res) => {
 });
 
 // Database Models bundle for sub-routers
-const dbModels = { User, Profile, Product, Category, Contact, Review, Cart, Order, License, AuditLog };
+const dbModels = { User, Profile, Product, Category, Contact, Review, Cart, Order, License, AuditLog, AccessGrant };
+
+// Cloud Access & Revocation Services
+const accessGrantService = require('./services/accessGrantService');
+const revocationScheduler = require('./services/revocationScheduler');
 
 // Mount Payment & Checkout routes (Razorpay + Test Mode)
 const createPaymentRouter = require('./routes/paymentRoutes');
@@ -1056,6 +1094,40 @@ app.use('/api/payment', createPaymentRouter(dbModels, authenticateToken));
 // Mount Customer License & Secure Download routes
 const createLicenseRouter = require('./routes/licenseRoutes');
 app.use('/api/licenses', createLicenseRouter(dbModels, authenticateToken, JWT_SECRET));
+
+// Mount 48-Hour Cloud Access Grant & Revocation routes
+const createAccessGrantRouter = require('./routes/accessGrantRoutes');
+app.use('/api/access', createAccessGrantRouter(dbModels, authenticateToken, isAdmin));
+
+// Admin Login (must be mounted before /api/admin middleware)
+app.post('/api/admin/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
+        const normalizedEmail = (email || '').toLowerCase().trim();
+        const user = await User.findOne({ email: normalizedEmail });
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+        if (user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized as admin' });
+        }
+        const token = jwt.sign({ id: user._id, role: 'admin' }, JWT_SECRET, { expiresIn: '8h' });
+        res.json({
+            message: 'Admin login successful',
+            token,
+            user: { id: user._id, email: user.email, fullname: user.fullname, role: 'admin' }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
 
 // Mount Admin License & Governance routes
 const createAdminLicenseRouter = require('./routes/adminLicenseRoutes');
@@ -1121,12 +1193,28 @@ app.post('/api/create-order', authenticateToken, async (req, res) => {
     }
 });
 
-// Get user's orders with status
+// Get user's orders with status & 48-Hour cloud access grant verification
 app.get('/api/orders', authenticateToken, async (req, res) => {
     try {
         const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
 
-        // Ensure approved orders have product driveUrls if missing
+        const orderIds = orders.map(o => o._id);
+        const [grants, licenses] = await Promise.all([
+            AccessGrant.find({ orderId: { $in: orderIds } }),
+            License.find({ orderId: { $in: orderIds } })
+        ]);
+        
+        const grantMap = new Map();
+        grants.forEach(g => {
+            grantMap.set(`${g.orderId.toString()}_${g.productId}`, g);
+        });
+
+        const licMap = new Map();
+        licenses.forEach(l => {
+            licMap.set(`${l.orderId.toString()}_${l.productId}`, l);
+        });
+
+        // Ensure approved orders have product driveUrls if missing and attach access grant metadata
         const productIds = [];
         orders.forEach(o => {
             if (o.status === 'Approved') {
@@ -1134,22 +1222,76 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
             }
         });
 
-        if (productIds.length > 0) {
-            const products = await Product.find({ id: { $in: productIds } });
-            const pMap = new Map(products.map(p => [p.id, p]));
-            orders.forEach(o => {
-                if (o.status === 'Approved') {
-                    o.items.forEach(i => {
-                        if (!i.driveUrl && pMap.has(i.productId)) {
-                            i.driveUrl = pMap.get(i.productId).driveUrl || '';
-                        }
-                    });
-                }
-            });
-        }
+        const products = productIds.length > 0 ? await Product.find({ id: { $in: productIds } }) : [];
+        const pMap = new Map(products.map(p => [p.id, p]));
+        const now = new Date();
 
-        res.json(orders);
+        const serializedOrders = orders.map(o => {
+            const orderObj = o.toObject();
+
+            if (orderObj.status === 'Approved') {
+                orderObj.items = (orderObj.items || []).map(item => {
+                    const grant = grantMap.get(`${o._id.toString()}_${item.productId}`);
+                    const linkedLic = licMap.get(`${o._id.toString()}_${item.productId}`);
+                    const isLicRevoked = linkedLic && linkedLic.status === 'Revoked';
+                    const isLicExpired = linkedLic && linkedLic.status === 'Expired';
+                    const rawDriveUrl = item.driveUrl || (pMap.get(item.productId)?.driveUrl || '');
+
+                    if (grant) {
+                        const isOverdue = now > new Date(grant.expiresAt);
+                        const isRevoked = isOverdue || isLicRevoked || isLicExpired || ['expired', 'revoked'].includes(grant.status);
+                        const remainingMs = Math.max(0, new Date(grant.expiresAt).getTime() - now.getTime());
+
+                        // Security: Only expose access gateway link while access is actively valid
+                        const safeAccessLink = isRevoked ? '' : `/api/access/open/${grant._id}`;
+                        item.driveUrl = safeAccessLink;
+
+                        const determinedStatus = isLicRevoked || grant.status === 'revoked'
+                            ? 'revoked'
+                            : (isOverdue || isLicExpired || grant.status === 'expired' ? 'expired' : grant.status);
+
+                        item.accessGrant = {
+                            id: grant._id,
+                            status: determinedStatus,
+                            storageProvider: grant.storageProvider,
+                            accessGrantedAt: grant.accessGrantedAt,
+                            expiresAt: grant.expiresAt,
+                            isExpired: isRevoked,
+                            remainingMs: remainingMs,
+                            remainingHours: (remainingMs / (1000 * 60 * 60)).toFixed(1),
+                            revokedAt: grant.revokedAt,
+                            revocationReason: linkedLic?.revokedReason || '',
+                            accessLink: safeAccessLink
+                        };
+                    } else if (isLicRevoked) {
+                        item.driveUrl = '';
+                        item.accessGrant = {
+                            status: 'revoked',
+                            isExpired: true,
+                            remainingHours: '0.0',
+                            revocationReason: linkedLic.revokedReason || 'Administrative revocation'
+                        };
+                    } else if (isLicExpired) {
+                        item.driveUrl = '';
+                        item.accessGrant = {
+                            status: 'expired',
+                            isExpired: true,
+                            remainingHours: '0.0'
+                        };
+                    } else if (rawDriveUrl) {
+                        item.driveUrl = rawDriveUrl;
+                    }
+
+                    return item;
+                });
+            }
+
+            return orderObj;
+        });
+
+        res.json(serializedOrders);
     } catch (error) {
+        console.error('Error fetching orders:', error);
         res.status(500).json({ message: 'Error fetching orders' });
     }
 });
@@ -1246,6 +1388,9 @@ app.put('/api/admin/orders/:orderId', authenticateToken, isAdmin, async (req, re
 
             // Automatically generate licenses and download limit tracking
             await licenseService.createLicensesForOrder(order, { License, Product, AuditLog });
+
+            // Automatically grant 48-hour customer access to cloud storage (Google Drive / OneDrive)
+            await accessGrantService.grantAccessForOrder(order, { AccessGrant, Product, AuditLog });
 
             // Send download links email to customer
             emailResult = await sendOrderApprovedEmail(order, adminNote);
@@ -1360,31 +1505,7 @@ app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => 
     }
 });
 
-// Admin Login
-app.post('/api/admin/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
-        if (user.role !== 'admin') {
-            return res.status(403).json({ message: 'Not authorized as admin' });
-        }
-        const token = jwt.sign({ id: user._id, role: 'admin' }, JWT_SECRET, { expiresIn: '20m' });
-        res.json({
-            message: 'Admin login successful',
-            token,
-            user: { id: user._id, email: user.email, fullname: user.fullname, role: 'admin' }
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-});
+
 
 
 
@@ -1588,7 +1709,41 @@ app.get('/api/admin/stats', authenticateToken, isAdmin, async (req, res) => {
 app.get('/api/admin/orders', authenticateToken, isAdmin, async (req, res) => {
     try {
         const orders = await Order.find().sort({ createdAt: -1 });
-        res.json(orders);
+        const orderIds = orders.map(o => o._id);
+        const grants = await AccessGrant.find({ orderId: { $in: orderIds } });
+        const grantMap = new Map();
+        grants.forEach(g => {
+            grantMap.set(`${g.orderId.toString()}_${g.productId}`, g);
+        });
+
+        const now = new Date();
+        const enrichedOrders = orders.map(o => {
+            const orderObj = o.toObject();
+            orderObj.items = (orderObj.items || []).map(item => {
+                const grant = grantMap.get(`${o._id.toString()}_${item.productId}`);
+                if (grant) {
+                    const isOverdue = now > new Date(grant.expiresAt);
+                    orderObj.hasAccessGrant = true;
+                    item.accessGrant = {
+                        id: grant._id,
+                        status: (grant.status === 'active' && isOverdue) ? 'expired' : grant.status,
+                        storageProvider: grant.storageProvider,
+                        permissionId: grant.permissionId,
+                        accessLink: grant.accessLink,
+                        accessGrantedAt: grant.accessGrantedAt,
+                        expiresAt: grant.expiresAt,
+                        isExpired: isOverdue || ['expired', 'revoked'].includes(grant.status),
+                        revokedAt: grant.revokedAt,
+                        revocationAttempts: grant.revocationAttempts,
+                        lastRevocationError: grant.lastRevocationError
+                    };
+                }
+                return item;
+            });
+            return orderObj;
+        });
+
+        res.json(enrichedOrders);
     } catch (error) {
         console.error('Error fetching admin orders:', error);
         res.status(500).json({ message: 'Error fetching orders' });
@@ -1762,6 +1917,8 @@ const seedAdmin = async () => {
 mongoose.connection.once('open', async () => {
     await seedProducts();
     await seedAdmin();
+    // Start 48-Hour Cloud Access Automatic Revocation Scheduler
+    revocationScheduler.start(dbModels);
 });
 
 const PORT = process.env.PORT || 5000;

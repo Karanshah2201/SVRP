@@ -9,6 +9,7 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import Navbar from '../components/Navbar'
 import api from '@/lib/api'
 import { getToken } from '@/lib/authStore'
+import { notifyCartItemAdded } from '@/lib/cartStore'
 import { toast } from 'sonner'
 import Footer from '../components/Footer'
 
@@ -19,6 +20,8 @@ export default function ProductDetailsPage() {
     const [viewMode, setViewMode] = useState('image')
     const [product, setProduct] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [isAdding, setIsAdding] = useState(false)
+    const [justAdded, setJustAdded] = useState(false)
 
     // Review state
     const [reviews, setReviews] = useState([])
@@ -95,13 +98,19 @@ export default function ProductDetailsPage() {
             toast.error('Please login to add items to cart')
             return
         }
+        setIsAdding(true)
         try {
             await api.post('/cart', { productId: product.id, quantity: 1 }, {
                 headers: { Authorization: `Bearer ${token}` }
             })
-            toast.success('Added to cart!')
+            notifyCartItemAdded(product.name)
+            setJustAdded(true)
+            toast.success(`"${product.name}" added to cart!`)
+            setTimeout(() => setJustAdded(false), 2400)
         } catch (error) {
-            toast.error('Failed to add to cart')
+            toast.error(error.response?.data?.message || 'Failed to add to cart')
+        } finally {
+            setIsAdding(false)
         }
     }
 
@@ -138,12 +147,14 @@ export default function ProductDetailsPage() {
         <div className="min-h-screen bg-background font-sans selection:bg-primary/20">
             <Navbar />
 
-            <main className="pt-36 pb-24 px-6 max-w-7xl mx-auto">
-                <Link to="/products" className="inline-flex items-center gap-2.5 text-primary/60 hover:text-primary mb-10 transition-all text-xs font-bold uppercase tracking-wider group">
-                    <div className="w-8 h-8 skeuo-card bg-white flex items-center justify-center group-hover:-translate-x-1 transition-transform border border-border/50 shadow-sm rounded-lg">
-                        <ArrowLeft size={16} />
-                    </div>
-                    Back to Products
+            <main id="main-content" className="page-container">
+                <Link
+                    to="/products"
+                    className="page-back-link group focus-ring rounded-lg px-1 py-0.5"
+                    aria-label="Back to Products"
+                >
+                    <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" aria-hidden="true" />
+                    <span>Back to Products</span>
                 </Link>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
@@ -262,38 +273,111 @@ export default function ProductDetailsPage() {
                             <p className="text-sm font-medium text-foreground/80 leading-relaxed whitespace-pre-wrap">{product.description}</p>
                         </div>
 
-                        {/* Features */}
-                        {product.features && product.features.length > 0 && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
-                                {product.features.map((feature, i) => (
-                                    <div key={i} className="flex items-center gap-4 skeuo-card bg-white/40 p-4 border-none shadow-none group">
-                                        <div className="w-8 h-8 skeuo-card bg-white text-secondary flex items-center justify-center shrink-0">
-                                            <Check size={16} />
-                                        </div>
-                                        <span className="text-[11px] font-black text-primary uppercase tracking-widest">{feature}</span>
-                                    </div>
-                                ))}
+                        {/* 3D Model Technical Specifications Grid */}
+                        <div className="bg-slate-50/80 rounded-2xl p-6 border border-border/60 mb-8 space-y-4">
+                            <h3 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-2">
+                                <Box size={15} /> 3D Asset Technical Specifications
+                            </h3>
+                            
+                            {/* Format Badges */}
+                            <div className="space-y-1.5">
+                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">Included Formats:</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(product.fileFormats || ['.blend', '.fbx', '.obj', '.stl', '.glb', '.zip']).map((fmt) => (
+                                        <span key={fmt} className="px-2.5 py-1 rounded-lg bg-white border border-border/70 text-xs font-mono font-bold text-foreground shadow-2xs">
+                                            {fmt}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
-                        )}
 
-                        {/* Digital Delivery Info Badge */}
-                        <div className="mb-6 p-4 rounded-2xl bg-secondary/10 border border-secondary/20 flex items-start gap-3">
-                            <Cloud size={18} className="text-secondary shrink-0 mt-0.5" />
-                            <div className="text-xs">
-                                <p className="font-black text-primary uppercase tracking-wider mb-0.5">Digital Asset Delivery</p>
-                                <p className="text-muted-foreground font-medium leading-relaxed">
-                                    3D Model files (.FBX, .OBJ, textures, Blender files) are hosted securely on Google Drive / OneDrive. Download access links are delivered directly to your email immediately upon payment verification.
-                                </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-border/40">
+                                <div className="p-2.5 rounded-xl bg-white border border-border/40">
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">File Size</span>
+                                    <span className="text-sm font-black text-primary font-mono">{product.fileSize || '68 MB'}</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-white border border-border/40">
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Polygons</span>
+                                    <span className="text-sm font-black text-foreground font-mono">{(product.polygonCount || 78500).toLocaleString()}</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-white border border-border/40">
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Download Limit</span>
+                                    <span className="text-sm font-black text-primary font-mono">{product.downloadLimit || 2} Downloads</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-white border border-border/40">
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Access Period</span>
+                                    <span className="text-sm font-black text-emerald-700 font-mono">{product.licenseDurationDays || 30} Days</span>
+                                </div>
                             </div>
                         </div>
 
+                        {/* License Terms & Anti-Copy Notice */}
+                        <div className="mb-6 p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                                <span className="font-bold text-primary flex items-center gap-1.5 uppercase tracking-wider">
+                                    <ShieldCheck size={16} /> Commercial 3D License Terms
+                                </span>
+                                <Link to="/terms" className="text-primary font-bold underline text-[11px]">
+                                    Full Terms
+                                </Link>
+                            </div>
+                            <p className="text-muted-foreground leading-relaxed">
+                                Includes single-seat commercial rights for compiled games, renders, and simulations. Redistribution or public re-upload of source meshes is strictly prohibited. Access is limited to <strong>{product.downloadLimit || 2} successful downloads</strong> within <strong>{product.licenseDurationDays || 30} days</strong> of purchase.
+                            </p>
+                            <p className="text-[11px] text-muted-foreground font-medium pt-1 border-t border-primary/10">
+                                <strong>Technical Notice:</strong> Revoking cloud access cannot delete files already saved on your local device. Please backup your downloads within the active 30-day window.
+                            </p>
+                        </div>
+
                         <div className="flex gap-4 mt-auto">
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.97 }}
+                                disabled={isAdding}
                                 onClick={handleAddToCart}
-                                className="flex-1 skeuo-button skeuo-button-primary h-14 flex items-center justify-center gap-3 text-sm font-bold tracking-wider uppercase rounded-xl"
+                                className={`flex-1 skeuo-button h-14 flex items-center justify-center gap-3 text-sm font-bold tracking-wider uppercase rounded-xl transition-all shadow-md ${
+                                    justAdded 
+                                        ? 'bg-emerald-600 text-white shadow-emerald-600/30 ring-2 ring-emerald-400' 
+                                        : 'skeuo-button-primary'
+                                }`}
                             >
-                                <ShoppingCart size={20} /> Add to Cart
-                            </button>
+                                <AnimatePresence mode="wait">
+                                    {justAdded ? (
+                                        <motion.div
+                                            key="added"
+                                            initial={{ scale: 0.5, opacity: 0 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            exit={{ scale: 0.5, opacity: 0 }}
+                                            className="flex items-center gap-2"
+                                        >
+                                            <Check size={20} className="stroke-[3]" />
+                                            <span>Added to Cart!</span>
+                                        </motion.div>
+                                    ) : isAdding ? (
+                                        <motion.div
+                                            key="adding"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="flex items-center gap-2"
+                                        >
+                                            <Loader2 size={20} className="animate-spin" />
+                                            <span>Adding to Cart...</span>
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div
+                                            key="default"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="flex items-center gap-2.5"
+                                        >
+                                            <ShoppingCart size={20} />
+                                            <span>Add to Cart</span>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </motion.button>
                             <button 
                                 onClick={() => toast.info('Digital 3D Model: Cloud download link is emailed automatically upon payment verification.')}
                                 className="px-6 skeuo-card bg-white h-14 text-primary flex items-center justify-center hover:text-secondary transition-colors border border-border/60 shadow-xs rounded-xl"

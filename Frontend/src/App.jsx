@@ -19,6 +19,10 @@ const PageLoader = () => (
 const LandingPage = lazy(() => import('./pages/Landing'))
 const AboutPage = lazy(() => import('./pages/About'))
 const ContactPage = lazy(() => import('./pages/Contact'))
+const TermsPage = lazy(() => import('./pages/Terms'))
+const DisclaimerPage = lazy(() => import('./pages/Disclaimer'))
+const PrivacyPage = lazy(() => import('./pages/Privacy'))
+const RefundPolicyPage = lazy(() => import('./pages/RefundPolicy'))
 
 // Lazy Load Auth Pages
 const AuthLayout = lazy(() => import('./pages/AuthLayout'))
@@ -36,6 +40,7 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const CheckoutSuccess = lazy(() => import('./pages/CheckoutSuccess'))
 const CheckoutCancel = lazy(() => import('./pages/CheckoutCancel'))
 const OrdersPage = lazy(() => import('./pages/OrdersPage'))
+const LicensesPage = lazy(() => import('./pages/LicensesPage'))
 
 // Lazy Load Admin Pages (Keep Admin and heavy charting bundle isolated)
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'))
@@ -46,19 +51,26 @@ const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'))
 const AdminContacts = lazy(() => import('./pages/admin/AdminContacts'))
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
 const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'))
+const AdminLicenses = lazy(() => import('./pages/admin/AdminLicenses'))
+const AdminAuditLogs = lazy(() => import('./pages/admin/AdminAuditLogs'))
 
 function App() {
   return (
     <>
       <Toaster position="top-center" richColors />
       <Router>
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         <ScrollToTop />
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            {/* Landing Page */}
+            {/* Public Pages */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/disclaimer" element={<DisclaimerPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/refund-policy" element={<RefundPolicyPage />} />
 
             {/* Auth Flow - Only for guests */}
             <Route element={<PublicRoute />}>
@@ -80,6 +92,7 @@ function App() {
               <Route path="/checkout/success" element={<CheckoutSuccess />} />
               <Route path="/checkout/cancel" element={<CheckoutCancel />} />
               <Route path="/orders" element={<OrdersPage />} />
+              <Route path="/licenses" element={<LicensesPage />} />
             </Route>
 
             {/* Admin Routes */}
@@ -92,6 +105,8 @@ function App() {
                 <Route path="/admin/contacts" element={<AdminContacts />} />
                 <Route path="/admin/reviews" element={<AdminReviews />} />
                 <Route path="/admin/orders" element={<AdminOrders />} />
+                <Route path="/admin/licenses" element={<AdminLicenses />} />
+                <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />
               </Route>
             </Route>
 

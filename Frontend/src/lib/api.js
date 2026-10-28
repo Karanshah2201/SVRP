@@ -14,8 +14,8 @@ const api = axios.create({
 // Add a request interceptor to include the token from memory
 api.interceptors.request.use(
     (config) => {
-        const token = getToken();
-        // Only set token if not already set (allows Admin routes to pass their own token)
+        const token = getToken() || (typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null);
+        // Only set token if not already set
         if (token && !config.headers.Authorization) {
             config.headers.Authorization = `Bearer ${token}`;
         }

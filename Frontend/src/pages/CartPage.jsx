@@ -27,6 +27,9 @@ const itemVariants = {
     }
 }
 
+import { PageHeader, EmptyState } from '@/components/ui'
+import { setCartCount } from '@/lib/cartStore'
+
 export default function CartPage() {
     const [cart, setCart] = useState([])
     const [loading, setLoading] = useState(true)
@@ -34,7 +37,10 @@ export default function CartPage() {
     const fetchCart = async () => {
         try {
             const res = await api.get('/cart')
-            setCart(res.data.items || [])
+            const items = res.data.items || []
+            setCart(items)
+            const count = items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
+            setCartCount(count)
         } catch (err) {
             console.error(err)
             toast.error('Failed to load access queue.')
@@ -79,55 +85,32 @@ export default function CartPage() {
         <div className="min-h-screen bg-background flex flex-col selection:bg-primary/10">
             <Navbar />
             
-            <main className="pt-48 pb-32 px-6 max-w-7xl mx-auto flex-grow w-full">
-                
-                <motion.div 
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="mb-12"
-                >
-                    <Link to="/products">
-                        <motion.button 
-                            whileHover={{ x: -4 }}
-                            className="skeuo-button skeuo-button-outline h-11 px-5 flex items-center gap-2.5 text-xs font-semibold"
-                        >
-                            <ArrowLeft size={16} />
-                            <span>Continue Shopping</span>
-                        </motion.button>
-                    </Link>
-                </motion.div>
-
-                <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex items-center gap-4 mb-10 pb-4 border-b border-border"
-                >
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-foreground">Shopping Cart</h1>
-                    <div className="px-3 py-1 rounded-xl bg-primary text-white text-xs font-semibold">
-                        {cart.length} item{cart.length !== 1 ? 's' : ''}
-                    </div>
-                </motion.div>
+            <main id="main-content" className="page-container">
+                <PageHeader
+                    title="Shopping Cart"
+                    subtitle="Review your selected 3D engineering models and proceed to secure licensing."
+                    backTo="/products"
+                    backLabel="Continue Shopping"
+                    badge={
+                        <span className="badge-status badge-info">
+                            {cart.length} item{cart.length !== 1 ? 's' : ''} in queue
+                        </span>
+                    }
+                />
 
                 {loading ? (
-                    <div className="text-center py-32">
+                    <div className="text-center py-32" role="status" aria-label="Loading your cart">
                         <Loader2 className="animate-spin mx-auto text-primary mb-4" size={40} />
                         <p className="text-sm font-semibold text-muted-foreground">Loading your cart...</p>
                     </div>
                 ) : cart.length === 0 ? (
-                    <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="skeuo-card p-16 sm:p-24 text-center bg-white"
-                    >
-                        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6 text-muted-foreground">
-                            <CartIcon size={28} />
-                        </div>
-                        <h2 className="text-xl font-bold text-foreground mb-2">Your Cart is Empty</h2>
-                        <p className="text-sm text-muted-foreground mb-8 max-w-md mx-auto">You haven't added any 3D models or engineering assets to your cart yet.</p>
-                        <Link to="/products">
-                            <button className="skeuo-button skeuo-button-primary px-8"> Browse Catalog </button>
-                        </Link>
-                    </motion.div>
+                    <EmptyState
+                        icon={CartIcon}
+                        title="Your Cart is Empty"
+                        description="You haven't added any 3D models or engineering assets to your cart yet. Explore our high-precision catalog."
+                        actionLabel="Browse Catalog"
+                        actionTo="/products"
+                    />
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                         <motion.div 

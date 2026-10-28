@@ -87,7 +87,7 @@ export default function Landing() {
             <Navbar />
 
             {/* Hero Section */}
-            <section className="pt-56 pb-32 px-6 max-w-7xl mx-auto relative overflow-hidden">
+            <section className="pt-36 sm:pt-40 pb-20 sm:pb-24 px-6 max-w-7xl mx-auto relative overflow-hidden">
                 <div className="flex flex-col lg:flex-row items-center gap-20 relative z-10">
 
                     {/* Left Content */}
@@ -106,7 +106,7 @@ export default function Landing() {
                             animate={{ opacity: 1, y: 0 }}
                             className="hero-h1 mb-8 text-shadow-premium leading-tight"
                         >
-                            Shri Viswakarma <br />
+                            Shri Vishwakarma <br />
                             <span className="rail-gradient uppercase block mt-1">Rail Production</span>
                         </motion.h1>
 
@@ -172,7 +172,7 @@ export default function Landing() {
             </section>
 
             {/* Top Products Grid */}
-            <section className="py-24 px-6 max-w-7xl mx-auto">
+            <section className="py-16 sm:py-20 px-6 max-w-7xl mx-auto">
                 <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
                     <div>
                         <h2 className="text-2xl md:text-3xl font-black text-primary tracking-tight mb-1">Featured 3D Models</h2>
@@ -195,7 +195,7 @@ export default function Landing() {
             </section>
 
             {/* Core Features - Bento Style */}
-            <section className="py-32 bg-muted/30 border-y border-border/10">
+            <section className="py-20 sm:py-24 bg-muted/30 border-y border-border/10">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {[
@@ -223,7 +223,7 @@ export default function Landing() {
             </section>
 
             {/* Final CTA */}
-            <section className="py-40 px-6 max-w-5xl mx-auto text-center">
+            <section className="py-20 sm:py-28 px-6 max-w-5xl mx-auto text-center">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.98 }}
                     whileInView={{ opacity: 1, scale: 1 }}

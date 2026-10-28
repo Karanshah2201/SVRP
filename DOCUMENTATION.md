@@ -1,4 +1,4 @@
-# Shri Viswakarma Rail Production — Project Documentation
+# Shri Vishwakarma Rail Production — Project Documentation
 
 > **Last Updated:** February 17, 2026  
 > **Tech Stack:** React (Vite) + Node.js (Express) + MongoDB  
@@ -28,7 +28,7 @@
 
 ## 1. Project Overview
 
-Shri Viswakarma Rail Production is a product catalog and management platform for railway infrastructure and equipment. It features:
+Shri Vishwakarma Rail Production is a product catalog and management platform for railway infrastructure and equipment. It features:
 
 - A **public-facing landing page** with a 3D model viewer
 - **User authentication** (login, register, forgot/update password)
@@ -624,5 +624,8 @@ npm run dev
 7. Navbar "Categories" dropdown shows categories with nested subcategories
 
 ---
+
+#Email: admin@svrp.com
+#Password: SvrpAdmin@2026
 
 *End of Documentation*

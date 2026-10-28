@@ -40,7 +40,7 @@ export default function CheckoutSuccess() {
         <SmoothScroll>
             <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20 selection:text-primary flex flex-col">
                 <Navbar />
-                <div className="pt-36 pb-20 px-6 max-w-2xl mx-auto text-center flex-grow w-full">
+                <main id="main-content" className="page-container-profile text-center">
                     {verifying ? (
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
@@ -149,7 +149,7 @@ export default function CheckoutSuccess() {
                             </Link>
                         </motion.div>
                     )}
-                </div>
+                </main>
 
                 <Footer />
             </div>

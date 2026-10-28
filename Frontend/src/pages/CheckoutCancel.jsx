@@ -10,7 +10,7 @@ export default function CheckoutCancel() {
         <SmoothScroll>
             <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20 selection:text-primary flex flex-col">
                 <Navbar />
-                <div className="pt-36 pb-20 px-6 max-w-2xl mx-auto text-center flex-grow w-full">
+                <main id="main-content" className="page-container-profile text-center">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -54,7 +54,7 @@ export default function CheckoutCancel() {
                             </Link>
                         </div>
                     </motion.div>
-                </div>
+                </main>
 
                 <Footer />
             </div>

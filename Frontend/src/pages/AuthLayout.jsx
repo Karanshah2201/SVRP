@@ -41,8 +41,8 @@ export default function AuthLayout() {
                         >
                             <img src="/svrp.png" alt="SVRP" className="h-10 w-auto" />
                         </motion.div>
-                        <span className="text-xs font-black tracking-[0.2em] text-primary/80 uppercase font-mono">
-                            SHREE VISWAKARMA
+                        <span className="text-xs sm:text-sm font-black tracking-wider text-primary uppercase font-mono text-center px-2">
+                            SVRP (Shri Vishwakarma Rail Production)
                         </span>
                     </Link>
                 </header>

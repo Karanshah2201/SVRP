@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X, LogOut, ChevronDown, Sparkles, User, ShoppingCart, ShoppingBag, Package } from 'lucide-react'
+import { Menu, X, LogOut, ChevronDown, Sparkles, User, ShoppingCart, ShoppingBag, Package, Key } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import api from '@/lib/api'
 import { isAuthenticated, clearAuth, getUser } from '@/lib/authStore'
+import { getCartCount, fetchCartCount, subscribeCart } from '@/lib/cartStore'
 
 let cachedCategories = null;
 let categoryPromise = null;
@@ -14,12 +15,31 @@ export default function Navbar() {
     const [hoveredLink, setHoveredLink] = useState(null)
     const [userMenuOpen, setUserMenuOpen] = useState(false)
     const [dbCategories, setDbCategories] = useState(() => cachedCategories || [])
+    const [cartCount, setCartCount] = useState(() => getCartCount())
+    const [isCartBouncing, setIsCartBouncing] = useState(false)
+    const [showPlusOne, setShowPlusOne] = useState(false)
     const location = useLocation()
     const navigate = useNavigate()
     const isLoggedIn = isAuthenticated()
     const currentUser = getUser()
 
     const isActive = (path) => location.pathname === path
+
+    useEffect(() => {
+        if (isLoggedIn) {
+            fetchCartCount()
+        }
+        const unsubscribe = subscribeCart(
+            (newCount) => setCartCount(newCount),
+            () => {
+                setIsCartBouncing(true)
+                setShowPlusOne(true)
+                setTimeout(() => setIsCartBouncing(false), 750)
+                setTimeout(() => setShowPlusOne(false), 1200)
+            }
+        )
+        return unsubscribe
+    }, [isLoggedIn])
 
     useEffect(() => {
         setUserMenuOpen(false)
@@ -103,7 +123,7 @@ export default function Navbar() {
                     </motion.div>
                     <div className="flex flex-col">
                         <span className="text-primary font-[900] text-lg tracking-tighter uppercase leading-none">SVRP</span>
-                        <span className="text-[length:var(--text-small)] font-mono font-black text-secondary tracking-[0.2em] leading-none mt-1 opacity-60">RAIL WORKS</span>
+                        <span className="text-[length:var(--text-small)] font-mono font-black text-secondary tracking-[0.2em] leading-none mt-1 opacity-80">RAIL PRODUCTION</span>
                     </div>
                 </Link>
 
@@ -204,14 +224,54 @@ export default function Navbar() {
                                 </motion.div>
                             </Link>
 
-                            {/* Direct Cart Quick Link */}
-                            <Link to="/cart" title="Shopping Cart">
+                            {/* Direct Cart Quick Link with Animated Count Badge */}
+                            <Link to="/cart" title="Shopping Cart" className="relative">
+                                {/* Floating +1 Animated Indicator */}
+                                <AnimatePresence>
+                                    {showPlusOne && (
+                                        <motion.span
+                                            initial={{ opacity: 1, y: 0, scale: 0.7 }}
+                                            animate={{ opacity: 0, y: -26, scale: 1.25 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.85, ease: "easeOut" }}
+                                            className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white font-black text-[11px] px-2 py-0.5 rounded-full pointer-events-none shadow-lg z-30 font-mono tracking-tight"
+                                        >
+                                            +1
+                                        </motion.span>
+                                    )}
+                                </AnimatePresence>
+
                                 <motion.div
                                     whileHover={{ scale: 1.05, y: -1 }}
                                     whileTap={{ scale: 0.95 }}
-                                    className={`w-11 h-11 rounded-xl bg-white border flex items-center justify-center transition-all shadow-2xs ${isActive('/cart') ? 'border-primary text-primary bg-primary/5' : 'border-border/60 text-foreground/70 hover:text-primary hover:border-primary/40'}`}
+                                    animate={isCartBouncing ? {
+                                        scale: [1, 1.35, 0.88, 1.15, 0.95, 1],
+                                        rotate: [0, -14, 14, -8, 8, 0],
+                                    } : { scale: 1, rotate: 0 }}
+                                    transition={{ duration: 0.65, ease: "easeInOut" }}
+                                    className={`w-11 h-11 rounded-xl bg-white border flex items-center justify-center transition-all shadow-2xs relative ${
+                                        isActive('/cart') 
+                                            ? 'border-primary text-primary bg-primary/5' 
+                                            : 'border-border/60 text-foreground/70 hover:text-primary hover:border-primary/40'
+                                    }`}
                                 >
-                                    <ShoppingCart size={17} />
+                                    {isCartBouncing && (
+                                        <span className="absolute inset-0 rounded-xl bg-amber-400/35 animate-ping pointer-events-none" />
+                                    )}
+                                    <ShoppingCart size={18} className={isCartBouncing ? 'text-amber-500 transition-colors' : ''} />
+                                    
+                                    {/* Product Count Badge */}
+                                    {cartCount > 0 && (
+                                        <motion.span
+                                            key={cartCount}
+                                            initial={{ scale: 0, rotate: -20 }}
+                                            animate={{ scale: [0, 1.35, 1], rotate: 0 }}
+                                            transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                                            className="absolute -top-1.5 -right-1.5 bg-gradient-to-tr from-amber-500 to-orange-500 text-white font-black text-[10px] min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center shadow-md border-2 border-white pointer-events-none font-mono"
+                                        >
+                                            {cartCount > 99 ? '99+' : cartCount}
+                                        </motion.span>
+                                    )}
                                 </motion.div>
                             </Link>
 
@@ -261,9 +321,22 @@ export default function Navbar() {
                                                         <ShoppingBag size={16} className="text-primary" />
                                                         <div className="flex-1 flex items-center justify-between">
                                                             <span>My Orders</span>
-                                                            <span className="text-[9px] bg-secondary/15 text-secondary px-1.5 py-0.5 rounded font-black uppercase">Downloads</span>
+                                                            <span className="text-[9px] bg-secondary/15 text-secondary px-1.5 py-0.5 rounded font-black uppercase">Orders</span>
                                                         </div>
                                                     </Link>
+
+                                                    <Link
+                                                        to="/licenses"
+                                                        onClick={() => setUserMenuOpen(false)}
+                                                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-foreground hover:bg-primary/5 hover:text-primary transition-colors"
+                                                    >
+                                                        <Key size={16} className="text-amber-600" />
+                                                        <div className="flex-1 flex items-center justify-between">
+                                                            <span>My Licenses</span>
+                                                            <span className="text-[9px] bg-amber-500/15 text-amber-700 px-1.5 py-0.5 rounded font-black uppercase">Downloads</span>
+                                                        </div>
+                                                    </Link>
+
 
                                                     <Link
                                                         to="/profile"
@@ -307,13 +380,37 @@ export default function Navbar() {
                     )}
                 </div>
 
-                {/* Mobile Trigger */}
-                <button
-                    className="md:hidden w-12 h-12 skeuo-card bg-white flex items-center justify-center text-primary border-white"
-                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                >
-                    {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                </button>
+                {/* Mobile Header Icons */}
+                <div className="flex md:hidden items-center gap-2.5">
+                    {/* Mobile Cart Quick Link */}
+                    {isLoggedIn && (
+                        <Link to="/cart" className="relative">
+                            <motion.div
+                                animate={isCartBouncing ? {
+                                    scale: [1, 1.35, 0.88, 1.15, 0.95, 1],
+                                    rotate: [0, -14, 14, -8, 8, 0],
+                                } : { scale: 1, rotate: 0 }}
+                                transition={{ duration: 0.65, ease: "easeInOut" }}
+                                className="w-11 h-11 skeuo-card bg-white flex items-center justify-center text-primary border-white rounded-xl relative shadow-xs"
+                            >
+                                <ShoppingCart size={18} />
+                                {cartCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-tr from-amber-500 to-orange-500 text-white font-black text-[10px] min-w-[19px] h-[19px] px-1 rounded-full flex items-center justify-center shadow-md border-2 border-white font-mono">
+                                        {cartCount > 99 ? '99+' : cartCount}
+                                    </span>
+                                )}
+                            </motion.div>
+                        </Link>
+                    )}
+
+                    {/* Mobile Trigger */}
+                    <button
+                        className="w-11 h-11 skeuo-card bg-white flex items-center justify-center text-primary border-white rounded-xl"
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    >
+                        {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                    </button>
+                </div>
             </div>
 
             {/* Mobile Menu */}
@@ -330,7 +427,7 @@ export default function Navbar() {
                                 <div className="skeuo-card p-2 bg-white">
                                     <img src="/svrp.png" alt="SVRP" className="h-8 w-auto grayscale" />
                                 </div>
-                                <span className="font-black uppercase tracking-tighter text-xl">SVRP RAIL</span>
+                                <span className="font-black uppercase tracking-tighter text-xl">SVRP</span>
                             </Link>
                             <button 
                                 onClick={() => setMobileMenuOpen(false)}
@@ -376,14 +473,25 @@ export default function Navbar() {
                                 </>
                             ) : (
                                 <div className="flex flex-col gap-3">
-                                    <Link
-                                        to="/orders"
-                                        onClick={() => setMobileMenuOpen(false)}
-                                        className="skeuo-button skeuo-button-primary h-14 text-white font-bold uppercase tracking-wider rounded-xl flex items-center justify-center gap-3"
-                                    >
-                                        <ShoppingBag size={18} />
-                                        My Orders & Downloads
-                                    </Link>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Link
+                                            to="/orders"
+                                            onClick={() => setMobileMenuOpen(false)}
+                                            className="skeuo-button skeuo-button-primary h-14 text-white font-bold uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 text-xs"
+                                        >
+                                            <ShoppingBag size={16} />
+                                            Orders
+                                        </Link>
+                                        <Link
+                                            to="/licenses"
+                                            onClick={() => setMobileMenuOpen(false)}
+                                            className="skeuo-button bg-amber-500 text-white h-14 font-bold uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 text-xs shadow-md"
+                                        >
+                                            <Key size={16} />
+                                            Licenses
+                                        </Link>
+                                    </div>
+
                                     <div className="grid grid-cols-2 gap-3">
                                         <Link
                                             to="/profile"
@@ -395,9 +503,15 @@ export default function Navbar() {
                                         <Link
                                             to="/cart"
                                             onClick={() => setMobileMenuOpen(false)}
-                                            className="skeuo-button bg-slate-50 h-12 text-foreground font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 border border-border/60"
+                                            className="skeuo-button bg-slate-50 h-12 text-foreground font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 border border-border/60 relative"
                                         >
-                                            <ShoppingCart size={16} /> Cart
+                                            <ShoppingCart size={16} /> 
+                                            <span>Cart</span>
+                                            {cartCount > 0 && (
+                                                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black font-mono">
+                                                    {cartCount}
+                                                </span>
+                                            )}
                                         </Link>
                                     </div>
                                     <button

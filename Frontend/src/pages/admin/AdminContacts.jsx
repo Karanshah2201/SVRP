@@ -66,9 +66,9 @@ export default function AdminContacts() {
                     <p className="text-muted-foreground font-medium text-base">No contact messages yet.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-[calc(100vh-200px)]">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 min-h-[500px] lg:h-[calc(100vh-200px)]">
                     {/* Message List */}
-                    <div className="lg:col-span-2 space-y-3 overflow-y-auto pr-2 pb-4 scrollbar-hide">
+                    <div className="lg:col-span-2 space-y-3 max-h-[360px] lg:max-h-none overflow-y-auto pr-2 pb-4 custom-scrollbar">
                         {contacts.map((c, i) => (
                             <motion.div
                                 key={c._id}
@@ -93,7 +93,7 @@ export default function AdminContacts() {
                                     </div>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleDelete(c._id) }}
-                                        className={`p-2 rounded-lg transition-all flex-shrink-0 opacity-0 group-hover:opacity-100 ${selected?._id === c._id
+                                        className={`p-2 rounded-lg transition-all flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 ${selected?._id === c._id
                                             ? 'text-white/80 hover:text-white hover:bg-white/20'
                                             : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
                                             }`}

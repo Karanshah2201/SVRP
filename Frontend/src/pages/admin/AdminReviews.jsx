@@ -219,7 +219,7 @@ export default function AdminReviews() {
                                     <button
                                         onClick={() => handleDelete(review._id)}
                                         disabled={deleting === review._id}
-                                        className="p-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 ml-4 border border-transparent hover:border-destructive/20"
+                                        className="p-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 ml-4 border border-transparent hover:border-destructive/20"
                                         title="Delete review"
                                     >
                                         {deleting === review._id ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Package, FolderOpen, Mail, Users, ShoppingBag, IndianRupee, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import api from '@/lib/api'
+import { StatusBadge } from '@/components/ui'
 
 const container = {
     hidden: { opacity: 0 },
@@ -299,16 +300,7 @@ export default function AdminDashboard() {
                                         ₹{order.totalAmount?.toLocaleString()}
                                     </td>
                                     <td className="py-3.5">
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${order.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
-                                            order.status === 'Rejected' ? 'bg-destructive/10 text-destructive border border-destructive/20' :
-                                                'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-                                            }`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${order.status === 'Approved' ? 'bg-emerald-500' :
-                                                order.status === 'Rejected' ? 'bg-destructive' :
-                                                    'bg-amber-500'
-                                                }`} />
-                                            {order.status}
-                                        </span>
+                                        <StatusBadge status={order.status} size="sm" />
                                     </td>
                                     <td className="py-3.5 pr-4 text-right text-xs font-medium text-muted-foreground">
                                         {new Date(order.createdAt).toLocaleDateString()}

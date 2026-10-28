@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar'
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import Footer from '../components/Footer'
+import { EmptyState } from '@/components/ui'
 
 export default function ProductsPage() {
     const [searchParams] = useSearchParams()
@@ -46,7 +47,7 @@ export default function ProductsPage() {
         <div className="min-h-screen bg-background font-sans selection:bg-primary/20 flex flex-col">
             <Navbar />
 
-            <main className="pt-36 pb-24 px-6 max-w-7xl mx-auto flex-grow w-full">
+            <main id="main-content" className="page-container">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
                     <div className="max-w-2xl">
@@ -116,23 +117,13 @@ export default function ProductsPage() {
                         ))}
                     </div>
                 ) : (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="skeuo-card bg-white p-16 sm:p-20 text-center border border-border/60 rounded-2xl shadow-sm"
-                    >
-                        <div className="w-20 h-20 skeuo-card bg-primary/5 flex items-center justify-center mx-auto mb-6 text-primary/30 rounded-2xl border border-primary/10">
-                            <Package size={36} />
-                        </div>
-                        <h2 className="text-2xl font-black text-primary mb-2">No Products Found</h2>
-                        <p className="text-muted-foreground text-sm mb-8 font-medium">Clear your search parameters or check back later for new 3D assets.</p>
-                        <button
-                            onClick={() => setSearchQuery('')}
-                            className="skeuo-button skeuo-button-primary px-8 py-3.5 mx-auto text-xs uppercase tracking-wider"
-                        >
-                            Clear Search
-                        </button>
-                    </motion.div>
+                    <EmptyState
+                        icon={Package}
+                        title="No Products Found"
+                        description="Clear your search parameters or check back later for new 3D assets."
+                        actionLabel="Clear Search"
+                        onAction={() => setSearchQuery('')}
+                    />
                 )}
             </main>
 

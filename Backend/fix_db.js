@@ -1,20 +1,35 @@
 const mongoose = require('mongoose');
+require('dotenv').config();
 
-mongoose.connect('mongodb+srv://karanshah2201_db_user:Railworks@cluster0.zrte0de.mongodb.net/?retryWrites=true&w=majority')
-    .then(async () => {
-        const ProductSchema = new mongoose.Schema({ price: String, name: String }, { strict: false, collection: 'products' });
-        const Product = mongoose.model('Product', ProductSchema);
-        const prods = await Product.find({});
-        console.log(`Found ${prods.length} products`);
-        let c = 0;
-        for (let p of prods) {
-            if (p.price && typeof p.price === 'string' && p.price.includes('$')) {
-                console.log('Updating:', p.name, p.price);
-                p.price = p.price.replace('$', '₹').replace('₹40/mo', '₹3000/mo').replace('₹40', '₹3000').replace('₹0.02', '₹2').replace('₹19.99', '₹1500').replace('₹5.00', '₹400');
-                await p.save();
-                c++;
+const uri = process.env.DATABASE_URL || process.env.MONGODB_URI;
+
+async function run() {
+    await mongoose.connect(uri);
+    console.log('Connected to MongoDB');
+
+    const updateResult = await mongoose.connection.collection('products').updateMany(
+        {
+            $or: [
+                { mediaUrl: { $regex: 'svrp-1\\.onrender\\.com' } },
+                { image: { $regex: 'svrp-1\\.onrender\\.com' } }
+            ]
+        },
+        {
+            $set: {
+                mediaUrl: '/1792314432612-603607.FBX',
+                image: '/1792314306858-650384.png'
             }
         }
-        console.log(`Updated ${c} products`);
-        process.exit(0);
-    }).catch(console.error);
+    );
+
+    console.log('Modified products count:', updateResult.modifiedCount);
+
+    const all = await mongoose.connection.collection('products').find({}).toArray();
+    all.forEach(p => {
+        console.log({ id: p._id, name: p.name, mediaType: p.mediaType, mediaUrl: p.mediaUrl, image: p.image });
+    });
+
+    await mongoose.disconnect();
+}
+
+run().catch(console.error);
