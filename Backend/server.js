@@ -27,11 +27,35 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 const app = express();
 
-// CORS - Allow all origins dynamically with credentials support
+// Trust reverse proxy (Render, Cloudflare, etc.) so client IP is accurately detected
+app.set('trust proxy', 1);
+
+// Optional compression middleware for optimized bandwidth and fast load times
+try {
+    const compression = require('compression');
+    app.use(compression());
+} catch (compErr) {
+    // Compression will activate when installed in production
+}
+
+// Allowed origins whitelist for production and development
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'https://svrp-frontend.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5000'
+].filter(Boolean);
+
+// CORS - Restricted to trusted frontend origins with credentials support
 const corsOptions = {
     origin: (origin, callback) => {
-        // Automatically allow any origin (reflects origin header so credentials work)
-        callback(null, true);
+        // Allow mobile apps, curl, uptime checkers, or server-to-server calls where origin is undefined
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin) || allowedOrigins.some(o => origin.startsWith(o))) {
+            return callback(null, true);
+        }
+        return callback(new Error('Blocked by CORS policy: Origin not allowed'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -64,7 +88,7 @@ const authLimiter = rateLimit({
 
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: isProduction ? 100 : 5000, // 5000 requests in dev to prevent Vite HMR / reload throttling
+    max: isProduction ? 1500 : 5000, // 5000 requests in dev to prevent Vite HMR / reload throttling
     message: { message: 'Too many requests. Please slow down.' },
     standardHeaders: true,
     legacyHeaders: false
@@ -198,6 +222,14 @@ const UserSchema = new mongoose.Schema({
         enum: ['user', 'admin'],
         default: 'user'
     },
+    resetPasswordToken: {
+        type: String,
+        default: null
+    },
+    resetPasswordExpires: {
+        type: Date,
+        default: null
+    },
     createdAt: {
         type: Date,
         default: Date.now
@@ -262,6 +294,21 @@ const authenticateToken = (req, res, next) => {
 // Routes
 app.get('/', (req, res) => {
     res.json({ message: 'Shri Vishwakarma Rail Production API is running' });
+});
+
+// Health check route for uptime monitors and container orchestration
+app.get(['/health', '/api/health'], (req, res) => {
+    const dbState = mongoose.connection.readyState;
+    const dbStatusMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+    const dbStatus = dbStatusMap[dbState] || 'unknown';
+    const isHealthy = dbState === 1;
+
+    res.status(isHealthy ? 200 : 503).json({
+        status: isHealthy ? 'healthy' : 'degraded',
+        database: dbStatus,
+        uptime: Math.floor(process.uptime()),
+        timestamp: new Date().toISOString()
+    });
 });
 
 app.post('/api/register', authLimiter, async (req, res) => {
@@ -377,22 +424,39 @@ app.post('/api/login', authLimiter, async (req, res) => {
 
 const handleForgotPassword = async (req, res) => {
     try {
-        const { email } = req.body;
+        const email = (req.body.email || '').toLowerCase().trim();
+        if (!email) {
+            return res.status(400).json({ message: 'Email is required' });
+        }
+
         const user = await User.findOne({ email });
 
         if (user) {
-            // Mock sending email
-            return res.json({ message: 'Password reset link sent to your email' });
+            const resetToken = crypto.randomBytes(32).toString('hex');
+            const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+            user.resetPasswordToken = hashedToken;
+            user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+            await user.save();
+
+            const frontendBaseUrl = process.env.FRONTEND_URL || 'https://svrp-frontend.onrender.com';
+            const resetUrl = `${frontendBaseUrl}/update-password?token=${resetToken}&email=${encodeURIComponent(user.email)}`;
+
+            console.log(`[Password Reset] Token generated for ${user.email}: ${resetUrl}`);
         }
 
-        res.status(404).json({ message: 'Email not found' });
+        // Generic response prevents account enumeration attacks
+        return res.json({ 
+            message: 'If an account exists with this email, password reset instructions have been sent.' 
+        });
     } catch (error) {
+        console.error('[Forgot Password Error]', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-app.post('/api/forgot-password', handleForgotPassword);
-app.post('/api/auth/forgot-password', handleForgotPassword);
+app.post('/api/forgot-password', authLimiter, handleForgotPassword);
+app.post('/api/auth/forgot-password', authLimiter, handleForgotPassword);
 
 app.get('/api/me', (req, res) => {
     if (req.session.user) {
@@ -413,27 +477,53 @@ app.post('/api/logout', (req, res) => {
     });
 });
 
-app.post('/api/update-password', async (req, res) => {
+app.post('/api/update-password', authLimiter, async (req, res) => {
     try {
-        const { email, password } = req.body;
-        const user = await User.findOne({ email });
+        const { email, token, password } = req.body;
+        const normalizedEmail = (email || '').toLowerCase().trim();
 
-        if (user) {
-            const hashedPassword = await bcrypt.hash(password, 12);
-            user.password = hashedPassword;
-            await user.save();
-            return res.json({ message: 'Password updated successfully' });
+        if (!normalizedEmail || !password) {
+            return res.status(400).json({ message: 'Email and new password are required' });
         }
 
-        res.status(404).json({ message: 'User not found' });
+        if (password.length < 8) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+        }
+
+        if (!token) {
+            return res.status(400).json({ message: 'Reset token is required to reset password' });
+        }
+
+        const hashedToken = crypto.createHash('sha256').update(token.trim()).digest('hex');
+
+        const user = await User.findOne({
+            email: normalizedEmail,
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Password reset link is invalid or has expired. Please request a new one.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 12);
+        user.password = hashedPassword;
+        user.resetPasswordToken = null;
+        user.resetPasswordExpires = null;
+        await user.save();
+
+        return res.json({ message: 'Password updated successfully. Please login with your new password.' });
     } catch (error) {
+        console.error('[Update Password Error]', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
 
-app.post('/api/update-profile', async (req, res) => {
+
+app.post('/api/update-profile', authenticateToken, async (req, res) => {
     try {
-        const { userId, fullname, email, phoneNumber, currentPassword, newPassword } = req.body;
+        const { fullname, email, phoneNumber, currentPassword, newPassword } = req.body;
+        const userId = req.user.id; // Enforce authenticated user ID
 
 
 
@@ -552,6 +642,23 @@ const CategorySchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 const Category = mongoose.model('Category', CategorySchema);
+
+// Banner / Promotional Slide Schema
+const BannerSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    subtitle: { type: String, default: '' },
+    badge: { type: String, default: 'Featured 3D Model' },
+    discount: { type: String, default: '' },
+    productId: { type: Number, default: null },
+    productName: { type: String, default: '' },
+    image: { type: String, default: '' },
+    ctaText: { type: String, default: 'View 3D Model' },
+    ctaLink: { type: String, default: '/products' },
+    isActive: { type: Boolean, default: true },
+    displayOrder: { type: Number, default: 0 },
+    createdAt: { type: Date, default: Date.now }
+});
+const Banner = mongoose.model('Banner', BannerSchema);
 
 // Review Schema
 const ReviewSchema = new mongoose.Schema({
@@ -846,6 +953,94 @@ const seedProducts = async () => {
     }
 };
 
+const initialBanners = [
+    {
+        title: "WAP-7 High-Speed Electric Locomotive 3D Asset",
+        subtitle: "Flagship 6000 HP digital asset with cab interior, modular pantographs & 4K PBR UDIM textures.",
+        badge: "Featured 3D Model",
+        discount: "Top Rated Asset",
+        productId: 2,
+        productName: "WAP-7 High-Speed Electric Locomotive 3D Asset",
+        image: "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&q=80&w=1000",
+        ctaText: "View 3D Model",
+        ctaLink: "/product/2",
+        isActive: true,
+        displayOrder: 1
+    },
+    {
+        title: "Vande Bharat Express Semi-High Speed Train Set",
+        subtitle: "Aerodynamic nose shell and modular passenger car set with commercial single-seat license.",
+        badge: "Exclusive Discount",
+        discount: "Save 25% Today",
+        productId: 3,
+        productName: "Vande Bharat Express Semi-High Speed Train Set",
+        image: "https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&q=80&w=1000",
+        ctaText: "Claim Discount",
+        ctaLink: "/product/3",
+        isActive: true,
+        displayOrder: 2
+    },
+    {
+        title: "ICF Passenger Coach Measurement Rig (LHB Series)",
+        subtitle: "CAD-calibrated bogie and chassis measurement apparatus ready for simulation and VR.",
+        badge: "New Release",
+        discount: "Fresh Release",
+        productId: 1,
+        productName: "ICF Passenger Coach Measurement Rig (LHB Series)",
+        image: "https://images.unsplash.com/photo-1541427468627-a89a96e5ca1d?auto=format&fit=crop&q=80&w=1000",
+        ctaText: "Explore Asset",
+        ctaLink: "/product/1",
+        isActive: true,
+        displayOrder: 3
+    }
+];
+
+const seedBanners = async () => {
+    try {
+        const count = await Banner.countDocuments();
+        if (count === 0) {
+            await Banner.insertMany(initialBanners);
+            console.log('Database initialized with default hero promotional banners');
+        }
+    } catch (error) {
+        console.error('Error seeding banners:', error);
+    }
+};
+
+// Public Banner endpoint: returns active banners or automatically generates dynamic slides from catalog products
+app.get('/api/banners', async (req, res) => {
+    try {
+        let banners = await Banner.find({ isActive: true }).sort({ displayOrder: 1, createdAt: -1 });
+
+        // If no custom banners created by admin yet, generate dynamic banners from latest products in DB
+        if (!banners || banners.length === 0) {
+            const products = await Product.find().sort({ rating: -1 }).limit(4);
+            const dynamicBadges = ['Featured 3D Model', 'Exclusive Discount', 'New Release', 'Special Offer'];
+            const dynamicDiscounts = ['Top Rated', 'Save 20%', 'New Arrival', 'Limited Deal'];
+
+            banners = products.map((p, idx) => ({
+                _id: 'auto-' + p.id,
+                title: p.name,
+                subtitle: p.description?.slice(0, 110) ? `${p.description.slice(0, 110)}...` : 'Precision engineered industrial railway asset.',
+                badge: dynamicBadges[idx % dynamicBadges.length],
+                discount: dynamicDiscounts[idx % dynamicDiscounts.length],
+                productId: p.id,
+                productName: p.name,
+                image: p.image || '/hero-3d.png',
+                ctaText: 'View 3D Model',
+                ctaLink: `/product/${p.id}`,
+                isActive: true,
+                displayOrder: idx + 1
+            }));
+        }
+
+        res.json(banners);
+    } catch (error) {
+        console.error('Error fetching public banners:', error);
+        res.status(500).json({ message: 'Error fetching banners' });
+    }
+});
+
 // Seed on startup is handled below after admin seed
 
 
@@ -1081,7 +1276,7 @@ app.delete('/api/cart/:productId', authenticateToken, async (req, res) => {
 });
 
 // Database Models bundle for sub-routers
-const dbModels = { User, Profile, Product, Category, Contact, Review, Cart, Order, License, AuditLog, AccessGrant };
+const dbModels = { User, Profile, Product, Category, Contact, Review, Cart, Order, License, AuditLog, AccessGrant, Banner };
 
 // Cloud Access & Revocation Services
 const accessGrantService = require('./services/accessGrantService');
@@ -1671,6 +1866,71 @@ app.delete('/api/admin/products/:id', authenticateToken, isAdmin, async (req, re
     }
 });
 
+// --- Promotional Hero Banners Management (Admin) ---
+app.get('/api/admin/banners', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const banners = await Banner.find().sort({ displayOrder: 1, createdAt: -1 });
+        res.json(banners);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching admin banners' });
+    }
+});
+
+app.post('/api/admin/banners', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const {
+            title, subtitle, badge, discount, productId,
+            productName, image, ctaText, ctaLink, isActive, displayOrder
+        } = req.body;
+
+        if (!title) {
+            return res.status(400).json({ message: 'Banner title is required' });
+        }
+
+        const banner = new Banner({
+            title,
+            subtitle: subtitle || '',
+            badge: badge || 'Featured 3D Model',
+            discount: discount || '',
+            productId: productId ? parseInt(productId) : null,
+            productName: productName || '',
+            image: image || '',
+            ctaText: ctaText || 'View 3D Model',
+            ctaLink: ctaLink || (productId ? `/product/${productId}` : '/products'),
+            isActive: isActive !== undefined ? Boolean(isActive) : true,
+            displayOrder: displayOrder ? parseInt(displayOrder) : 0
+        });
+
+        await banner.save();
+        res.status(201).json({ message: 'Banner created successfully', banner });
+    } catch (error) {
+        res.status(500).json({ message: 'Error creating banner', error: error.message });
+    }
+});
+
+app.put('/api/admin/banners/:id', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const banner = await Banner.findByIdAndUpdate(
+            req.params.id,
+            { $set: req.body },
+            { new: true }
+        );
+        if (!banner) return res.status(404).json({ message: 'Banner not found' });
+        res.json({ message: 'Banner updated successfully', banner });
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating banner', error: error.message });
+    }
+});
+
+app.delete('/api/admin/banners/:id', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        await Banner.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Banner deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting banner' });
+    }
+});
+
 // --- Contact Submissions ---
 app.get('/api/admin/contacts', authenticateToken, isAdmin, async (req, res) => {
     try {
@@ -1693,13 +1953,14 @@ app.delete('/api/admin/contacts/:id', authenticateToken, isAdmin, async (req, re
 // --- Dashboard Stats ---
 app.get('/api/admin/stats', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const [products, categories, contacts, users] = await Promise.all([
+        const [products, categories, contacts, users, banners] = await Promise.all([
             Product.countDocuments(),
             Category.countDocuments(),
             Contact.countDocuments(),
-            User.countDocuments({ role: 'user' })
+            User.countDocuments({ role: 'user' }),
+            Banner.countDocuments()
         ]);
-        res.json({ products, categories, contacts, users });
+        res.json({ products, categories, contacts, users, banners });
     } catch (error) {
         res.status(500).json({ message: 'Error fetching stats' });
     }
@@ -1916,9 +2177,27 @@ const seedAdmin = async () => {
 
 mongoose.connection.once('open', async () => {
     await seedProducts();
+    await seedBanners();
     await seedAdmin();
     // Start 48-Hour Cloud Access Automatic Revocation Scheduler
     revocationScheduler.start(dbModels);
+});
+
+// Centralized Error Handling Middleware
+app.use((err, req, res, next) => {
+    console.error('[Unhandled Server Error]', err);
+    if (res.headersSent) return next(err);
+    res.status(err.status || 500).json({
+        message: isProduction ? 'An unexpected server error occurred.' : (err.message || 'Server error')
+    });
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Unhandled Rejection]', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('[Uncaught Exception]', err);
 });
 
 const PORT = process.env.PORT || 5000;

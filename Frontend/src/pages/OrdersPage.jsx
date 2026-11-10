@@ -29,7 +29,7 @@ export default function OrdersPage() {
         if (targetUrl.startsWith('/api/')) {
             const baseUrl = import.meta.env.VITE_API_URL 
                 ? import.meta.env.VITE_API_URL.replace(/\/api$/, '') 
-                : 'http://localhost:5000';
+                : (import.meta.env.PROD ? 'https://svrp-1.onrender.com' : 'http://localhost:5000');
             targetUrl = `${baseUrl}${targetUrl}`;
         }
         if (token && targetUrl.includes('/api/access/open/')) {

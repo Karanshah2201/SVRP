@@ -1,9 +1,14 @@
 const mongoose = require('mongoose');
+require('dotenv').config();
 
-// Use identical connection logic to server.js
-mongoose.connect('mongodb+srv://karanshah2201_db_user:Railworks@cluster0.zrte0de.mongodb.net/?retryWrites=true&w=majority')
+const uri = process.env.DATABASE_URL || process.env.MONGODB_URI;
+if (!uri) {
+    console.error('DATABASE_URL is not set in environment');
+    process.exit(1);
+}
+
+mongoose.connect(uri)
     .then(async () => {
-        // We don't define a strict schema, just the fields we want to check
         const ProductSchema = new mongoose.Schema({ price: String, name: String }, { strict: false, collection: 'products' });
         const Product = mongoose.model('Product', ProductSchema);
 

@@ -23,6 +23,7 @@ const TermsPage = lazy(() => import('./pages/Terms'))
 const DisclaimerPage = lazy(() => import('./pages/Disclaimer'))
 const PrivacyPage = lazy(() => import('./pages/Privacy'))
 const RefundPolicyPage = lazy(() => import('./pages/RefundPolicy'))
+const NotFoundPage = lazy(() => import('./pages/NotFound'))
 
 // Lazy Load Auth Pages
 const AuthLayout = lazy(() => import('./pages/AuthLayout'))
@@ -46,6 +47,7 @@ const LicensesPage = lazy(() => import('./pages/LicensesPage'))
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'))
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminBanners = lazy(() => import('./pages/admin/AdminBanners'))
 const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'))
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'))
 const AdminContacts = lazy(() => import('./pages/admin/AdminContacts'))
@@ -100,6 +102,7 @@ function App() {
             <Route element={<AdminRoute />}>
               <Route element={<AdminLayout />}>
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/admin/banners" element={<AdminBanners />} />
                 <Route path="/admin/products" element={<AdminProducts />} />
                 <Route path="/admin/categories" element={<AdminCategories />} />
                 <Route path="/admin/contacts" element={<AdminContacts />} />
@@ -113,8 +116,8 @@ function App() {
             {/* Handle static site /index.html hits */}
             <Route path="/index.html" element={<Navigate to="/" replace />} />
 
-            {/* Catch all redirect */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            {/* 404 Not Found */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </Router>

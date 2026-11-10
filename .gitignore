@@ -27,3 +27,10 @@ Thumbs.db
 dist/
 build/
 
+
+# DB maintenance & scratch scripts
+Backend/fix_db.js
+Backend/fix_prices.js
+Backend/list_db.js
+Backend/list_prices.js
+Backend/seed_orders.js

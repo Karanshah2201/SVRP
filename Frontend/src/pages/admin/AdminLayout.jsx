@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, FolderOpen, Mail, LogOut, MessageSquare, ShoppingBag, Key, Activity, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Package, FolderOpen, Mail, LogOut, MessageSquare, ShoppingBag, Key, Activity, Menu, X, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const sidebarLinks = [
     { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/admin/banners', icon: Sparkles, label: 'Hero Banners' },
     { to: '/admin/products', icon: Package, label: '3D Products' },
     { to: '/admin/orders', icon: ShoppingBag, label: 'Orders' },
     { to: '/admin/licenses', icon: Key, label: 'Licenses & Limits' },

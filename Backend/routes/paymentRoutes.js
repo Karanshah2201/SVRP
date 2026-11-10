@@ -93,7 +93,12 @@ function createPaymentRouter(models, authenticateToken) {
                 const rzpData = await razorpayRes.json();
                 razorpayOrderId = rzpData.id;
             } else {
-                // Simulated Razorpay Order ID for sandbox evaluation
+                if (process.env.NODE_ENV === 'production') {
+                    return res.status(503).json({
+                        message: 'Payment gateway credentials (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET) are not configured on server.'
+                    });
+                }
+                // Simulated Razorpay Order ID for sandbox evaluation in development only
                 razorpayOrderId = `order_sim_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
             }
 
@@ -164,10 +169,18 @@ function createPaymentRouter(models, authenticateToken) {
                     .update(body.toString())
                     .digest('hex');
 
-                isValid = (expectedSignature === razorpay_signature);
-            } else {
-                // In simulation mode without live credentials, verify non-empty fields
+                if (razorpay_signature && typeof razorpay_signature === 'string' && expectedSignature.length === razorpay_signature.length) {
+                    isValid = crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(razorpay_signature));
+                } else {
+                    isValid = false;
+                }
+            } else if (process.env.NODE_ENV !== 'production') {
+                // In local dev sandbox without credentials, allow simulated verification
                 isValid = !!(razorpay_order_id && razorpay_payment_id);
+            } else {
+                return res.status(503).json({
+                    message: 'Payment gateway verification is unavailable: Live keys not configured.'
+                });
             }
 
             if (!isValid) {

@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
-import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, CheckCircle2, Loader2, ArrowLeft } from 'lucide-react'
-import { useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Eye, EyeOff, CheckCircle2, Loader2, ArrowLeft, KeyRound } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import { toast } from 'sonner'
 
@@ -26,18 +26,37 @@ const itemVariants = {
 
 export default function UpdatePasswordPage() {
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [isSubmitted, setIsSubmitted] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+
+    const tokenFromUrl = searchParams.get('token') || ''
+    const emailFromUrl = searchParams.get('email') || ''
+
     const [formData, setFormData] = useState({
-        email: '',
+        email: emailFromUrl,
+        token: tokenFromUrl,
         password: '',
         confirmPassword: ''
     })
 
+    useEffect(() => {
+        if (emailFromUrl || tokenFromUrl) {
+            setFormData(prev => ({
+                ...prev,
+                email: emailFromUrl || prev.email,
+                token: tokenFromUrl || prev.token
+            }))
+        }
+    }, [emailFromUrl, tokenFromUrl])
+
     const handleSubmit = async (e) => {
         e.preventDefault()
+        if (!formData.token || !formData.token.trim()) {
+            return toast.error('Security reset token is required. Please check your reset link.')
+        }
         if (formData.password !== formData.confirmPassword) {
             return toast.error('Passwords do not match.')
         }
@@ -48,6 +67,7 @@ export default function UpdatePasswordPage() {
         try {
             await api.post('/update-password', {
                 email: formData.email,
+                token: formData.token.trim(),
                 password: formData.password
             })
             setIsSubmitted(true)
@@ -71,12 +91,12 @@ export default function UpdatePasswordPage() {
                 <p className="text-sm font-medium text-muted-foreground">
                     {isSubmitted 
                         ? "Your password has been changed successfully." 
-                        : "Enter your registered email and choose a new password."}
+                        : "Enter your registered email, reset token, and choose a new password."}
                 </p>
             </motion.div>
 
             {!isSubmitted ? (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-5">
                     {/* Email Field */}
                     <motion.div variants={itemVariants} className="space-y-2">
                         <label>Email Address</label>
@@ -86,6 +106,26 @@ export default function UpdatePasswordPage() {
                             className="skeuo-input"
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            required
+                        />
+                    </motion.div>
+
+                    {/* Reset Token Field */}
+                    <motion.div variants={itemVariants} className="space-y-2">
+                        <label className="flex items-center justify-between">
+                            <span>Reset Security Token</span>
+                            {tokenFromUrl && (
+                                <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                                    <KeyRound size={12} /> Auto-filled from link
+                                </span>
+                            )}
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Paste your reset token here"
+                            className="skeuo-input font-mono text-xs"
+                            value={formData.token}
+                            onChange={(e) => setFormData({ ...formData, token: e.target.value })}
                             required
                         />
                     </motion.div>
