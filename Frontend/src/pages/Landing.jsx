@@ -450,36 +450,6 @@ export default function Landing() {
                 </div>
             </section>
 
-            {/* PROMOTIONAL DISCOUNT BANNER CALLOUT */}
-            <section className="py-10 px-4 sm:px-6 max-w-7xl mx-auto">
-                <div className="skeuo-card bg-gradient-to-r from-[#130324] via-[#20083b] to-[#130324] text-white p-8 sm:p-10 rounded-2xl relative overflow-hidden border border-white/10 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="relative z-10 max-w-2xl text-center md:text-left">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-white text-[11px] font-mono font-black uppercase tracking-wider mb-3">
-                            <Tag size={12} />
-                            <span>Limited Commercial Licensing</span>
-                        </div>
-                        <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                            Looking for Custom 3D Rolling Stock CAD Assets?
-                        </h3>
-                        <p className="text-white/70 text-xs sm:text-sm mt-1.5 leading-relaxed">
-                            Our engineering team crafts precision Blender, FBX, OBJ, and CAD-compliant simulation models tailored for rail transport enterprises globally.
-                        </p>
-                    </div>
-
-                    <div className="relative z-10 shrink-0">
-                        <Link to="/contact">
-                            <button className="skeuo-button skeuo-button-secondary px-8 h-12 text-xs font-bold uppercase tracking-wider rounded-xl shadow-lg">
-                                Inquire Custom Model
-                            </button>
-                        </Link>
-                    </div>
-
-                    {/* Ambient light glow */}
-                    <div className="absolute top-0 right-1/4 w-64 h-64 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-secondary/15 rounded-full blur-3xl pointer-events-none" />
-                </div>
-            </section>
-
             {/* BENTO CORE INDUSTRIAL CAPABILITIES */}
             <section className="py-20 sm:py-24 bg-muted/30 border-y border-border/10">
                 <div className="max-w-7xl mx-auto px-6">
@@ -530,37 +500,6 @@ export default function Landing() {
                         ))}
                     </div>
                 </div>
-            </section>
-
-            {/* FINAL ENTERPRISE CTA */}
-            <section className="py-20 sm:py-28 px-6 max-w-5xl mx-auto text-center">
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    className="skeuo-card bg-primary p-12 sm:p-20 relative overflow-hidden text-white border-none shadow-2xl rounded-3xl"
-                >
-                    <div className="relative z-10">
-                        <div className="w-16 h-16 skeuo-card bg-white/10 flex items-center justify-center mx-auto mb-6 border-white/10 rounded-2xl">
-                            <Layout size={32} className="text-white" />
-                        </div>
-                        <h2 className="text-2xl md:text-4xl font-black text-white mb-4 tracking-tight">
-                            Ready to Build Your Rail Projects?
-                        </h2>
-                        <p className="text-white/80 mb-10 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-                            Sign up today to explore, license, and immediately download commercial 3D rail infrastructure models and assets.
-                        </p>
-                        <Link to="/register">
-                            <button className="skeuo-button skeuo-button-secondary px-10 h-13 text-xs font-bold uppercase tracking-wider shadow-xl rounded-xl">
-                                Create Free Account
-                            </button>
-                        </Link>
-                    </div>
-
-                    {/* Ambient visual orbs */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary/15 rounded-full -ml-32 -mb-32 blur-3xl pointer-events-none" />
-                </motion.div>
             </section>
 
             <Footer />
