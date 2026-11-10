@@ -24,7 +24,7 @@ Thumbs.db
 .idea/
 
 # Build
-dist/
+# dist/ (tracked for Render deployment)
 build/
 
 

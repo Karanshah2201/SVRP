@@ -292,7 +292,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Routes
-app.get('/', (req, res) => {
+app.get(['/api', '/api/ping'], (req, res) => {
     res.json({ message: 'Shri Vishwakarma Rail Production API is running' });
 });
 
@@ -2182,6 +2182,22 @@ mongoose.connection.once('open', async () => {
     // Start 48-Hour Cloud Access Automatic Revocation Scheduler
     revocationScheduler.start(dbModels);
 });
+
+// Serve Frontend Static Files & SPA Fallback for Single Page Application
+const frontendDistPath = fs.existsSync(path.resolve(__dirname, '../Frontend/dist/index.html'))
+    ? path.resolve(__dirname, '../Frontend/dist')
+    : (fs.existsSync(path.resolve(__dirname, 'dist/index.html')) ? path.resolve(__dirname, 'dist') : null);
+
+if (frontendDistPath) {
+    console.log(`[Static Frontend] Serving client application from: ${frontendDistPath}`);
+    app.use(express.static(frontendDistPath));
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+            return next();
+        }
+        res.sendFile(path.join(frontendDistPath, 'index.html'));
+    });
+}
 
 // Centralized Error Handling Middleware
 app.use((err, req, res, next) => {
