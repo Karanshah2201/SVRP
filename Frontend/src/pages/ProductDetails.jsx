@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import {
     ArrowLeft, Star, Check, ShieldCheck, Gauge, Box,
     Image as ImageIcon, Download, Loader2, Play, Music,
-    MessageSquare, Send, User, Clock, ShoppingCart, Cloud
+    MessageSquare, Send, User, Clock, ShoppingCart, Cloud,
+    HardDrive, Layers, FileCheck, ExternalLink, Sparkles, CheckCircle2
 } from 'lucide-react'
 import { useState, useEffect, lazy, Suspense } from 'react'
 import Navbar from '../components/Navbar'
@@ -26,7 +27,7 @@ export default function ProductDetailsPage() {
     // Review state
     const [reviews, setReviews] = useState([])
     const [averageRating, setAverageRating] = useState(0)
-    const [_totalReviews, setTotalReviews] = useState(0)
+    const [totalReviews, setTotalReviews] = useState(0)
     const [userRating, setUserRating] = useState(0)
     const [hoverRating, setHoverRating] = useState(0)
     const [reviewComment, setReviewComment] = useState('')
@@ -59,9 +60,9 @@ export default function ProductDetailsPage() {
     const fetchReviews = async () => {
         try {
             const res = await api.get(`/products/${id}/reviews`)
-            setReviews(res.data.reviews)
-            setAverageRating(res.data.averageRating)
-            setTotalReviews(res.data.totalReviews)
+            setReviews(res.data.reviews || [])
+            setAverageRating(res.data.averageRating || 0)
+            setTotalReviews(res.data.totalReviews || 0)
         } catch (error) {
             console.error("Failed to fetch reviews", error)
         }
@@ -70,7 +71,7 @@ export default function ProductDetailsPage() {
     const handleSubmitReview = async (e) => {
         e.preventDefault()
         if (userRating === 0) {
-            toast.error('Please select a rating')
+            toast.error('Please select a star rating')
             return
         }
         setSubmittingReview(true)
@@ -81,7 +82,7 @@ export default function ProductDetailsPage() {
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             })
-            toast.success('Review submitted!')
+            toast.success('Your review has been published!')
             setUserRating(0)
             setReviewComment('')
             setShowReviewForm(false)
@@ -95,7 +96,7 @@ export default function ProductDetailsPage() {
 
     const handleAddToCart = async () => {
         if (!token) {
-            toast.error('Please login to add items to cart')
+            toast.error('Please sign in to add assets to your cart')
             return
         }
         setIsAdding(true)
@@ -124,9 +125,11 @@ export default function ProductDetailsPage() {
         return (
             <div className="min-h-screen bg-background flex flex-col items-center justify-center">
                 <div className="w-16 h-16 skeuo-card bg-white flex items-center justify-center border border-border/60 shadow-sm rounded-2xl">
-                    <Loader2 className="animate-spin text-primary" size={32} />
+                    <Loader2 className="animate-spin text-primary" size={30} />
                 </div>
-                <p className="text-primary mt-4 text-xs font-bold uppercase tracking-wider">Loading 3D Model...</p>
+                <p className="text-primary mt-4 text-xs font-mono font-bold uppercase tracking-widest">
+                    Initializing 3D Asset Environment...
+                </p>
             </div>
         )
     }
@@ -135,42 +138,56 @@ export default function ProductDetailsPage() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center p-6">
                 <div className="skeuo-card bg-white p-10 text-center border border-border/60 rounded-2xl shadow-sm max-w-md">
-                    <h2 className="text-2xl font-black text-primary mb-3">Product Not Found</h2>
-                    <p className="text-muted-foreground text-sm mb-6">The requested 3D model could not be found or has been removed.</p>
-                    <Link to="/products" className="skeuo-button skeuo-button-primary inline-flex text-xs uppercase tracking-wider">Back to Products</Link>
+                    <Box size={40} className="mx-auto text-primary/30 mb-3" />
+                    <h2 className="text-2xl font-black text-primary mb-2">Model Not Found</h2>
+                    <p className="text-muted-foreground text-xs leading-relaxed mb-6">
+                        The requested 3D model could not be found or has been temporarily decommissioned.
+                    </p>
+                    <Link to="/products" className="skeuo-button skeuo-button-primary inline-flex text-xs uppercase tracking-wider px-6 h-11 rounded-xl">
+                        Back to 3D Catalog
+                    </Link>
                 </div>
             </div>
         )
     }
+
+    const formattedPrice = (product?.price && /^\D/.test(product.price))
+        ? product.price
+        : `₹${product?.price || 0}`
 
     return (
         <div className="min-h-screen bg-background font-sans selection:bg-primary/20">
             <Navbar />
 
             <main id="main-content" className="page-container">
+                {/* Breadcrumb / Back Link */}
                 <Link
                     to="/products"
                     className="page-back-link group focus-ring rounded-lg px-1 py-0.5"
                     aria-label="Back to Products"
                 >
                     <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" aria-hidden="true" />
-                    <span>Back to Products</span>
+                    <span>Back to 3D Catalog</span>
                 </Link>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
-                    {/* Left Column: Media */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+                    {/* Left Column: Interactive 3D Canvas & Media Viewer */}
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
+                        initial={{ opacity: 0, scale: 0.97 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="space-y-8"
+                        transition={{ duration: 0.4 }}
+                        className="space-y-6"
                     >
-                        <div className="aspect-[4/3] skeuo-card bg-white overflow-hidden relative group p-3">
-                            <div className="w-full h-full rounded-2xl overflow-hidden relative border border-primary/5">
+                        {/* Main Media Container */}
+                        <div className="aspect-[4/3] skeuo-card bg-[#130324] overflow-hidden relative group p-3 rounded-2xl border border-primary/10 shadow-xl">
+                            <div className="w-full h-full rounded-xl overflow-hidden relative bg-black/40 flex items-center justify-center">
                                 {viewMode === '3d' && (product.mediaType === '3d' || product.modelUrl) ? (
                                     <Suspense fallback={
-                                        <div className="w-full h-full min-h-[350px] bg-slate-100 flex flex-col items-center justify-center gap-3">
-                                            <Loader2 className="animate-spin text-primary" size={28} />
-                                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Loading 3D Canvas...</span>
+                                        <div className="w-full h-full min-h-[350px] bg-[#130324] flex flex-col items-center justify-center gap-3 text-white">
+                                            <Loader2 className="animate-spin text-secondary" size={32} />
+                                            <span className="text-xs font-mono font-bold tracking-widest uppercase text-white/70">
+                                                Mounting Interactive WebGL Canvas...
+                                            </span>
                                         </div>
                                     }>
                                         <ModelViewer modelUrl={product.mediaUrl || product.modelUrl} />
@@ -185,28 +202,64 @@ export default function ProductDetailsPage() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" />
+                                    <img
+                                        src={product.image}
+                                        alt={product.name}
+                                        loading="eager"
+                                        className="w-full h-full object-cover"
+                                    />
                                 )}
                             </div>
 
-                            {/* View Toggle */}
+                            {/* View Mode Switching Controls Bar */}
                             {(product.mediaType !== 'image' || product.modelUrl) && (
-                                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 skeuo-card bg-white/90 backdrop-blur-md p-2 flex items-center gap-2 border-white">
-                                    <button onClick={() => setViewMode('image')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'image' ? 'bg-primary text-white shadow-lg' : 'text-primary/40 hover:bg-primary/5'}`}>
+                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 skeuo-card bg-white/95 backdrop-blur-xl p-1.5 flex items-center gap-1.5 border border-white/80 shadow-2xl rounded-xl z-20">
+                                    <button
+                                        onClick={() => setViewMode('image')}
+                                        className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                                            viewMode === 'image'
+                                                ? 'bg-primary text-white shadow-xs'
+                                                : 'text-foreground/70 hover:bg-muted/60'
+                                        }`}
+                                    >
                                         <ImageIcon size={14} /> Image
                                     </button>
+
                                     {(product.mediaType === '3d' || product.modelUrl) && (
-                                        <button onClick={() => setViewMode('3d')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === '3d' ? 'bg-primary text-white shadow-lg' : 'text-primary/40 hover:bg-primary/5'}`}>
-                                            <Box size={14} /> 3D View
+                                        <button
+                                            onClick={() => setViewMode('3d')}
+                                            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                                                viewMode === '3d'
+                                                    ? 'bg-secondary text-white shadow-xs'
+                                                    : 'text-foreground/70 hover:bg-muted/60'
+                                            }`}
+                                        >
+                                            <Box size={14} /> 3D Orbit View
                                         </button>
                                     )}
+
                                     {product.mediaType === 'video' && (
-                                        <button onClick={() => setViewMode('video')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'video' ? 'bg-primary text-white shadow-lg' : 'text-primary/40 hover:bg-primary/5'}`}>
+                                        <button
+                                            onClick={() => setViewMode('video')}
+                                            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                                                viewMode === 'video'
+                                                    ? 'bg-primary text-white shadow-xs'
+                                                    : 'text-foreground/70 hover:bg-muted/60'
+                                            }`}
+                                        >
                                             <Play size={14} /> Video
                                         </button>
                                     )}
+
                                     {product.mediaType === 'audio' && (
-                                        <button onClick={() => setViewMode('audio')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'audio' ? 'bg-primary text-white shadow-lg' : 'text-primary/40 hover:bg-primary/5'}`}>
+                                        <button
+                                            onClick={() => setViewMode('audio')}
+                                            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                                                viewMode === 'audio'
+                                                    ? 'bg-primary text-white shadow-xs'
+                                                    : 'text-foreground/70 hover:bg-muted/60'
+                                            }`}
+                                        >
                                             <Music size={14} /> Audio
                                         </button>
                                     )}
@@ -214,74 +267,101 @@ export default function ProductDetailsPage() {
                             )}
                         </div>
 
-                        {/* Specs Grid */}
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="skeuo-card bg-white p-6 border-none shadow-inner-flat">
-                                <div className="w-10 h-10 skeuo-card bg-tertiary/10 flex items-center justify-center mb-4 text-primary">
-                                    <ShieldCheck size={20} />
+                        {/* Visual Quality Specs Card */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="skeuo-card bg-white p-5 border border-border/70 rounded-2xl">
+                                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3 text-primary">
+                                    <ShieldCheck size={18} />
                                 </div>
-                                <h4 className="text-[10px] font-black text-primary uppercase tracking-widest">Industrial Grade</h4>
-                                <p className="text-[11px] font-bold text-muted-foreground mt-1">Verified blueprints for professional production line usage.</p>
+                                <h4 className="text-xs font-mono font-bold text-primary uppercase tracking-wider">Industrial Grade</h4>
+                                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                                    CAD-calibrated 1:1 scale rolling stock geometry verified for railway engineering.
+                                </p>
                             </div>
-                            <div className="skeuo-card bg-white p-6 border-none shadow-inner-flat">
-                                <div className="w-10 h-10 skeuo-card bg-secondary/10 flex items-center justify-center mb-4 text-secondary">
-                                    <Gauge size={20} />
+
+                            <div className="skeuo-card bg-white p-5 border border-border/70 rounded-2xl">
+                                <div className="w-9 h-9 rounded-xl bg-secondary/10 flex items-center justify-center mb-3 text-secondary">
+                                    <Gauge size={18} />
                                 </div>
-                                <h4 className="text-[10px] font-black text-primary uppercase tracking-widest">Optimized Mesh</h4>
-                                <p className="text-[11px] font-bold text-muted-foreground mt-1">High-performance topology for real-time visualization.</p>
+                                <h4 className="text-xs font-mono font-bold text-secondary uppercase tracking-wider">Clean Quad Topology</h4>
+                                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                                    Zero non-manifold faces, game-engine optimized LODs ready for UE5 & Unity.
+                                </p>
                             </div>
                         </div>
                     </motion.div>
 
-                    {/* Right Column: Details */}
+                    {/* Right Column: Commercial Details & Actions */}
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 }}
+                        transition={{ delay: 0.15, duration: 0.4 }}
                         className="flex flex-col"
                     >
-                        {/* Status Badges */}
-                        <div className="flex items-center gap-3 mb-8">
-                            <div className="skeuo-card bg-white px-3 py-1.5 flex items-center gap-2 shadow-none border-none">
+                        {/* Rating & Category Header Pill */}
+                        <div className="flex flex-wrap items-center gap-2.5 mb-4">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-border/70 rounded-full shadow-2xs">
                                 <div className="flex">
                                     {[...Array(5)].map((_, i) => (
-                                        <Star key={i} size={14} className={i < Math.round(averageRating || product.rating) ? 'text-secondary fill-secondary' : 'text-primary/10 fill-primary/10'} />
+                                        <Star
+                                            key={i}
+                                            size={13}
+                                            className={i < Math.round(averageRating || product.rating || 5) ? 'text-tertiary fill-tertiary' : 'text-primary/15 fill-primary/15'}
+                                        />
                                     ))}
                                 </div>
-                                <span className="text-primary font-black text-[10px] uppercase tracking-widest">{averageRating || product.rating} / 5.0</span>
+                                <span className="text-primary font-mono font-bold text-[11px] uppercase tracking-wider">
+                                    {averageRating || product.rating || '5.0'} / 5.0
+                                </span>
                             </div>
+
+                            <span className="px-3 py-1 rounded-full bg-primary text-white text-[10px] font-mono font-black uppercase tracking-wider">
+                                {product.category || 'Asset'}
+                            </span>
+
                             {product.subcategory && (
-                                <div className="skeuo-card bg-primary text-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest">
+                                <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-[10px] font-mono font-bold uppercase tracking-wider border border-slate-200">
                                     {product.subcategory}
-                                </div>
+                                </span>
                             )}
                         </div>
 
-                        <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-primary tracking-tight mb-4 leading-tight">
+                        {/* Product Title */}
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-primary tracking-tight mb-4 leading-tight">
                             {product.name}
                         </h1>
 
-                        <div className="flex items-baseline gap-4 mb-8 pb-8 border-b border-border/50">
-                            <span className="text-4xl md:text-5xl font-black text-primary">{(product?.price && /^\D/.test(product.price)) ? product.price : `₹${product?.price || 0}`}</span>
-                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Commercial License Included</span>
+                        {/* Price & Commercial License Ribbon */}
+                        <div className="flex flex-wrap items-baseline gap-3 mb-6 pb-6 border-b border-border/60">
+                            <span className="text-3xl sm:text-4xl font-black text-secondary font-mono">
+                                {formattedPrice}
+                            </span>
+                            <span className="text-xs font-mono font-bold text-muted-foreground uppercase tracking-wider">
+                                Commercial Single-Seat License
+                            </span>
                         </div>
 
-                        <div className="skeuo-card bg-white p-6 sm:p-8 mb-8 border border-border/60 rounded-2xl shadow-xs">
-                            <h3 className="text-xs font-bold text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <Box size={15} /> Product Description
+                        {/* Description */}
+                        <div className="skeuo-card bg-white p-5 sm:p-6 mb-6 border border-border/70 rounded-2xl shadow-2xs">
+                            <h3 className="text-xs font-mono font-bold text-primary uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <FileCheck size={14} className="text-secondary" /> Model Overview
                             </h3>
-                            <p className="text-sm font-medium text-foreground/80 leading-relaxed whitespace-pre-wrap">{product.description}</p>
+                            <p className="text-xs sm:text-sm font-medium text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                                {product.description || 'High-precision industrial rail 3D model with calibrated dimensions and PBR materials.'}
+                            </p>
                         </div>
 
-                        {/* 3D Model Technical Specifications Grid */}
-                        <div className="bg-slate-50/80 rounded-2xl p-6 border border-border/60 mb-8 space-y-4">
-                            <h3 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-2">
-                                <Box size={15} /> 3D Asset Technical Specifications
+                        {/* 3D Asset Technical Specifications Grid */}
+                        <div className="bg-slate-50/90 rounded-2xl p-5 border border-border/70 mb-6 space-y-4">
+                            <h3 className="text-xs font-mono font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                                <Box size={14} className="text-primary" /> Technical Specifications
                             </h3>
-                            
-                            {/* Format Badges */}
+
+                            {/* Included Formats */}
                             <div className="space-y-1.5">
-                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">Included Formats:</span>
+                                <span className="text-[11px] font-mono font-bold text-muted-foreground uppercase tracking-wider block">
+                                    Archive Includes:
+                                </span>
                                 <div className="flex flex-wrap gap-1.5">
                                     {(product.fileFormats || ['.blend', '.fbx', '.obj', '.stl', '.glb', '.zip']).map((fmt) => (
                                         <span key={fmt} className="px-2.5 py-1 rounded-lg bg-white border border-border/70 text-xs font-mono font-bold text-foreground shadow-2xs">
@@ -291,53 +371,71 @@ export default function ProductDetailsPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-border/40">
+                            {/* 4-Column Technical Metrics */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-border/40">
                                 <div className="p-2.5 rounded-xl bg-white border border-border/40">
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">File Size</span>
-                                    <span className="text-sm font-black text-primary font-mono">{product.fileSize || '68 MB'}</span>
+                                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider block">
+                                        Archive Size
+                                    </span>
+                                    <span className="text-sm font-black text-primary font-mono">
+                                        {product.fileSize || '68 MB'}
+                                    </span>
                                 </div>
+
                                 <div className="p-2.5 rounded-xl bg-white border border-border/40">
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Polygons</span>
-                                    <span className="text-sm font-black text-foreground font-mono">{(product.polygonCount || 78500).toLocaleString()}</span>
+                                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider block">
+                                        Polygons
+                                    </span>
+                                    <span className="text-sm font-black text-foreground font-mono">
+                                        {(product.polygonCount || 78500).toLocaleString()}
+                                    </span>
                                 </div>
+
                                 <div className="p-2.5 rounded-xl bg-white border border-border/40">
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Download Limit</span>
-                                    <span className="text-sm font-black text-primary font-mono">{product.downloadLimit || 2} Downloads</span>
+                                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider block">
+                                        Download Limit
+                                    </span>
+                                    <span className="text-sm font-black text-primary font-mono">
+                                        {product.downloadLimit || 2} Downloads
+                                    </span>
                                 </div>
+
                                 <div className="p-2.5 rounded-xl bg-white border border-border/40">
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Access Period</span>
-                                    <span className="text-sm font-black text-emerald-700 font-mono">{product.licenseDurationDays || 30} Days</span>
+                                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider block">
+                                        License Window
+                                    </span>
+                                    <span className="text-sm font-black text-emerald-700 font-mono">
+                                        {product.licenseDurationDays || 30} Days
+                                    </span>
                                 </div>
                             </div>
                         </div>
 
                         {/* License Terms & Anti-Copy Notice */}
-                        <div className="mb-6 p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-2 text-xs">
+                        <div className="mb-6 p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-1.5 text-xs">
                             <div className="flex items-center justify-between">
-                                <span className="font-bold text-primary flex items-center gap-1.5 uppercase tracking-wider">
-                                    <ShieldCheck size={16} /> Commercial 3D License Terms
+                                <span className="font-mono font-bold text-primary flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                                    <ShieldCheck size={14} className="text-secondary" /> Commercial EULA Rights
                                 </span>
                                 <Link to="/terms" className="text-primary font-bold underline text-[11px]">
-                                    Full Terms
+                                    License Agreement
                                 </Link>
                             </div>
-                            <p className="text-muted-foreground leading-relaxed">
-                                Includes single-seat commercial rights for compiled games, renders, and simulations. Redistribution or public re-upload of source meshes is strictly prohibited. Access is limited to <strong>{product.downloadLimit || 2} successful downloads</strong> within <strong>{product.licenseDurationDays || 30} days</strong> of purchase.
-                            </p>
-                            <p className="text-[11px] text-muted-foreground font-medium pt-1 border-t border-primary/10">
-                                <strong>Technical Notice:</strong> Revoking cloud access cannot delete files already saved on your local device. Please backup your downloads within the active 30-day window.
+                            <p className="text-muted-foreground text-xs leading-relaxed">
+                                Authorizes single-seat commercial rendering, game engine compilation (UE5, Unity), and simulation pipelines. Access is restricted to <strong>{product.downloadLimit || 2} cloud downloads</strong> within <strong>{product.licenseDurationDays || 30} days</strong> of purchase.
                             </p>
                         </div>
 
-                        <div className="flex gap-4 mt-auto">
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 mt-auto">
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.97 }}
+                                whileTap={{ scale: 0.98 }}
                                 disabled={isAdding}
                                 onClick={handleAddToCart}
-                                className={`flex-1 skeuo-button h-14 flex items-center justify-center gap-3 text-sm font-bold tracking-wider uppercase rounded-xl transition-all shadow-md ${
+                                className={`flex-1 skeuo-button h-13 flex items-center justify-center gap-2.5 text-xs font-bold tracking-wider uppercase rounded-xl transition-all shadow-md ${
                                     justAdded 
-                                        ? 'bg-emerald-600 text-white shadow-emerald-600/30 ring-2 ring-emerald-400' 
+                                        ? 'bg-emerald-600 text-white shadow-emerald-600/30' 
                                         : 'skeuo-button-primary'
                                 }`}
                             >
@@ -350,7 +448,7 @@ export default function ProductDetailsPage() {
                                             exit={{ scale: 0.5, opacity: 0 }}
                                             className="flex items-center gap-2"
                                         >
-                                            <Check size={20} className="stroke-[3]" />
+                                            <Check size={18} className="stroke-[3]" />
                                             <span>Added to Cart!</span>
                                         </motion.div>
                                     ) : isAdding ? (
@@ -361,7 +459,7 @@ export default function ProductDetailsPage() {
                                             exit={{ opacity: 0 }}
                                             className="flex items-center gap-2"
                                         >
-                                            <Loader2 size={20} className="animate-spin" />
+                                            <Loader2 size={18} className="animate-spin" />
                                             <span>Adding to Cart...</span>
                                         </motion.div>
                                     ) : (
@@ -370,55 +468,64 @@ export default function ProductDetailsPage() {
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             exit={{ opacity: 0 }}
-                                            className="flex items-center gap-2.5"
+                                            className="flex items-center gap-2"
                                         >
-                                            <ShoppingCart size={20} />
+                                            <ShoppingCart size={18} />
                                             <span>Add to Cart</span>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
                             </motion.button>
+
                             <button 
-                                onClick={() => toast.info('Digital 3D Model: Cloud download link is emailed automatically upon payment verification.')}
-                                className="px-6 skeuo-card bg-white h-14 text-primary flex items-center justify-center hover:text-secondary transition-colors border border-border/60 shadow-xs rounded-xl"
-                                title="Digital Delivery info"
+                                onClick={() => toast.info('Digital Asset: Cloud download link is dispatched automatically to your registered email upon checkout.')}
+                                className="px-5 skeuo-card bg-white h-13 text-primary flex items-center justify-center hover:text-secondary transition-colors border border-border/70 shadow-2xs rounded-xl"
+                                title="Delivery Information"
                             >
-                                <Download size={20} />
+                                <Download size={18} />
                             </button>
                         </div>
                     </motion.div>
                 </div>
 
-                {/* === Reviews Section === */}
-                <section className="mt-28">
-                    <div className="flex items-center justify-between mb-12 px-4 border-l-4 border-secondary">
+                {/* === Reviews & Verified Feedback Section === */}
+                <section className="mt-24 pt-12 border-t border-border/70">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
                         <div>
-                            <h2 className="text-3xl font-black text-primary tracking-tight">Customer Reviews</h2>
-                            <p className="text-xs font-semibold text-muted-foreground mt-1">Verified feedback from clients & 3D creators</p>
+                            <div className="flex items-center gap-2 text-primary font-mono text-xs uppercase tracking-widest font-bold mb-1">
+                                <Sparkles size={14} className="text-secondary" />
+                                <span>Verified Feedback</span>
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl font-black text-primary tracking-tight">
+                                Customer Reviews ({totalReviews || reviews.length})
+                            </h2>
                         </div>
+
                         {token && (
                             <button
                                 onClick={() => setShowReviewForm(!showReviewForm)}
-                                className="skeuo-button bg-white text-xs uppercase font-bold tracking-wider px-6 py-2.5 border border-border/60 shadow-xs"
+                                className="skeuo-button skeuo-button-outline text-xs uppercase font-bold tracking-wider px-5 h-10 border border-border/70 shadow-2xs rounded-xl shrink-0"
                             >
-                                Write a Review
+                                {showReviewForm ? 'Cancel Review' : 'Write a Review'}
                             </button>
                         )}
                     </div>
 
-                    {/* Review Form */}
+                    {/* Review Submission Form */}
                     <AnimatePresence>
                         {showReviewForm && (
                             <motion.div
-                                initial={{ opacity: 0, y: 20 }}
+                                initial={{ opacity: 0, y: 15 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 20 }}
-                                className="mb-12"
+                                exit={{ opacity: 0, y: 15 }}
+                                className="mb-10"
                             >
-                                <form onSubmit={handleSubmitReview} className="skeuo-card bg-white p-8 sm:p-10 max-w-2xl border border-border/70 rounded-2xl shadow-sm">
-                                    <h3 className="text-xs font-bold text-primary uppercase tracking-wider mb-6">Your Rating</h3>
+                                <form onSubmit={handleSubmitReview} className="skeuo-card bg-white p-6 sm:p-8 max-w-2xl border border-border/70 rounded-2xl shadow-sm">
+                                    <h3 className="text-xs font-mono font-bold text-primary uppercase tracking-wider mb-4">
+                                        Select Your Star Rating *
+                                    </h3>
                                     
-                                    <div className="flex items-center gap-3 mb-8">
+                                    <div className="flex items-center gap-2.5 mb-6">
                                         {[1, 2, 3, 4, 5].map(star => (
                                             <button
                                                 key={star}
@@ -426,40 +533,45 @@ export default function ProductDetailsPage() {
                                                 onClick={() => setUserRating(star)}
                                                 onMouseEnter={() => setHoverRating(star)}
                                                 onMouseLeave={() => setHoverRating(0)}
-                                                className="w-11 h-11 rounded-xl bg-slate-50 border border-border/60 flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
+                                                className="w-10 h-10 rounded-xl bg-slate-50 border border-border/60 flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
                                             >
                                                 <Star
-                                                    size={22}
+                                                    size={20}
                                                     className={`${star <= (hoverRating || userRating) ? 'text-secondary fill-secondary' : 'text-primary/10 fill-primary/10'}`}
                                                 />
                                             </button>
                                         ))}
+                                        <span className="text-xs font-mono font-bold text-muted-foreground ml-2">
+                                            {userRating ? `${userRating} / 5 Stars` : 'Click to rate'}
+                                        </span>
                                     </div>
 
-                                    <div className="space-y-2 mb-6">
-                                        <label className="text-xs font-bold text-primary uppercase tracking-wider block">Your Comments</label>
+                                    <div className="space-y-1.5 mb-6">
+                                        <label className="text-xs font-mono font-bold text-foreground uppercase tracking-wider block">
+                                            Feedback Comments
+                                        </label>
                                         <textarea
                                             value={reviewComment}
                                             onChange={(e) => setReviewComment(e.target.value)}
-                                            placeholder="Write your review about this 3D model..."
-                                            rows={4}
-                                            className="w-full skeuo-input p-4 text-sm font-medium resize-none border border-border/70 rounded-xl"
+                                            placeholder="Share your experience regarding mesh quality, texturing, scale accuracy, or rendering..."
+                                            rows={3}
+                                            className="w-full bg-white border border-border p-3.5 text-sm font-medium rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-muted-foreground/50 resize-none"
                                         />
                                     </div>
 
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-3">
                                         <button
                                             type="submit"
                                             disabled={submittingReview}
-                                            className="skeuo-button skeuo-button-primary px-8 h-12 flex items-center gap-2.5 text-xs tracking-wider uppercase rounded-xl"
+                                            className="skeuo-button skeuo-button-primary px-6 h-11 flex items-center gap-2 text-xs tracking-wider uppercase rounded-xl"
                                         >
-                                            {submittingReview ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
+                                            {submittingReview ? <Loader2 className="animate-spin" size={15} /> : <Send size={15} />}
                                             Submit Review
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setShowReviewForm(false)}
-                                            className="px-6 text-xs font-bold text-muted-foreground uppercase tracking-wider"
+                                            className="px-4 text-xs font-bold text-muted-foreground hover:text-foreground uppercase tracking-wider"
                                         >
                                             Cancel
                                         </button>
@@ -469,48 +581,65 @@ export default function ProductDetailsPage() {
                         )}
                     </AnimatePresence>
 
-                    {/* Reviews List */}
+                    {/* Reviews Cards Grid */}
                     {reviews.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {reviews.map((review, i) => (
                                 <motion.div
                                     key={review._id}
-                                    initial={{ opacity: 0, y: 20 }}
+                                    initial={{ opacity: 0, y: 15 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.1 }}
-                                    className="skeuo-card bg-white p-6 border border-border/60 rounded-2xl shadow-xs"
+                                    transition={{ delay: i * 0.08 }}
+                                    className="skeuo-card bg-white p-6 border border-border/70 rounded-2xl shadow-2xs flex flex-col justify-between"
                                 >
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-bold text-sm">
-                                                {review.userId?.fullname?.charAt(0)?.toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-foreground">{review.userId?.fullname || 'Customer'}</p>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <div className="flex">
-                                                        {[...Array(5)].map((_, s) => (
-                                                            <Star key={s} size={12} className={s < review.rating ? 'text-secondary fill-secondary' : 'text-primary/10 fill-primary/10'} />
-                                                        ))}
+                                    <div>
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center font-bold text-xs uppercase font-mono shadow-2xs">
+                                                    {review.userId?.fullname?.charAt(0)?.toUpperCase() || 'C'}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-foreground">
+                                                        {review.userId?.fullname || 'Verified Client'}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <div className="flex">
+                                                            {[...Array(5)].map((_, s) => (
+                                                                <Star
+                                                                    key={s}
+                                                                    size={12}
+                                                                    className={s < review.rating ? 'text-secondary fill-secondary' : 'text-primary/10 fill-primary/10'}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                                                            {formatDate(review.createdAt)}
+                                                        </span>
                                                     </div>
-                                                    <span className="text-[10px] font-semibold text-muted-foreground uppercase">{formatDate(review.createdAt)}</span>
                                                 </div>
                                             </div>
+
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                                <CheckCircle2 size={11} /> Verified
+                                            </span>
                                         </div>
+
+                                        {review.comment && (
+                                            <p className="text-xs font-medium text-foreground/80 leading-relaxed bg-slate-50 p-3 rounded-xl border border-border/40 mt-3">
+                                                "{review.comment}"
+                                            </p>
+                                        )}
                                     </div>
-                                    {review.comment && (
-                                        <div className="p-3.5 rounded-xl bg-slate-50 border border-border/40">
-                                            <p className="text-xs font-medium text-foreground/80 italic leading-relaxed">"{review.comment}"</p>
-                                        </div>
-                                    )}
                                 </motion.div>
                             ))}
                         </div>
                     ) : (
-                        <div className="skeuo-card bg-white p-16 sm:p-20 text-center border border-border/60 rounded-2xl shadow-xs">
-                            <MessageSquare size={40} className="mx-auto text-primary/20 mb-4" />
-                            <h3 className="text-xl font-bold text-primary mb-1">No Reviews Yet</h3>
-                            <p className="text-muted-foreground text-sm font-medium">Be the first to share your review on this 3D model.</p>
+                        <div className="skeuo-card bg-white p-12 text-center border border-border/60 rounded-2xl shadow-2xs max-w-xl mx-auto">
+                            <MessageSquare size={36} className="mx-auto text-primary/25 mb-3" />
+                            <h3 className="text-lg font-bold text-primary mb-1">No Reviews Yet</h3>
+                            <p className="text-muted-foreground text-xs leading-relaxed max-w-sm mx-auto">
+                                Be the first verified engineer or 3D creator to review this rolling stock model.
+                            </p>
                         </div>
                     )}
                 </section>

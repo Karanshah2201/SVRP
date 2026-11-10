@@ -271,15 +271,29 @@ export default function CheckoutPage() {
                     />
 
                     {/* Step indicator */}
-                    <div className="flex items-center gap-3 mb-10">
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider ${step >= 1 ? 'bg-primary text-white shadow-md' : 'bg-muted text-muted-foreground'}`}>
-                            <span className="w-5 h-5 rounded-md bg-white/20 text-white flex items-center justify-center text-xs">1</span>
-                            Licensee Contact
+                    <div className="flex items-center gap-3 mb-10 max-w-xl">
+                        <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                            step >= 1 
+                                ? 'bg-primary text-white shadow-md shadow-primary/20 ring-2 ring-primary/20' 
+                                : 'bg-muted text-muted-foreground'
+                        }`}>
+                            <span className="w-5 h-5 rounded-md bg-white/20 text-white flex items-center justify-center text-[11px] font-mono">
+                                {step > 1 ? <CheckCircle2 size={13} className="text-white" /> : '1'}
+                            </span>
+                            <span>1. Licensee Contact</span>
                         </div>
-                        <div className="w-8 h-px bg-border" />
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider ${step >= 2 ? 'bg-primary text-white shadow-md' : 'bg-muted text-muted-foreground'}`}>
-                            <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs ${step >= 2 ? 'bg-white/20 text-white' : 'bg-muted-foreground/20 text-muted-foreground'}`}>2</span>
-                            Payment & Terms
+                        <div className={`flex-1 h-0.5 rounded-full transition-colors ${step > 1 ? 'bg-primary' : 'bg-border'}`} />
+                        <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                            step >= 2 
+                                ? 'bg-primary text-white shadow-md shadow-primary/20 ring-2 ring-primary/20' 
+                                : 'bg-muted text-muted-foreground'
+                        }`}>
+                            <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-mono ${
+                                step >= 2 ? 'bg-white/20 text-white' : 'bg-muted-foreground/20 text-muted-foreground'
+                            }`}>
+                                2
+                            </span>
+                            <span>2. Payment & Terms</span>
                         </div>
                     </div>
 
@@ -403,53 +417,71 @@ export default function CheckoutPage() {
 
                                         {/* Payment Method Selector */}
                                         <div className="space-y-4 mb-8">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-primary/80 block">
-                                                Select Payment Method:
-                                            </label>
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-xs font-bold uppercase tracking-wider text-primary block">
+                                                    Select Payment Method
+                                                </label>
+                                                <span className="text-[11px] font-mono text-muted-foreground">Encrypted Gateway</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                                                 <button
                                                     type="button"
                                                     onClick={() => setPaymentMethod('razorpay')}
-                                                    className={`p-4 rounded-xl border text-left transition-all ${
+                                                    className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden ${
                                                         paymentMethod === 'razorpay'
-                                                            ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-xs'
-                                                            : 'border-border/60 hover:border-border'
+                                                            ? 'border-primary bg-primary/5 ring-2 ring-primary/25 shadow-sm'
+                                                            : 'border-border/60 hover:border-primary/40 bg-white'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center gap-2 mb-1.5 font-bold text-xs text-foreground">
-                                                        <CreditCard size={15} className="text-primary" /> Razorpay
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2 font-black text-xs text-primary">
+                                                            <CreditCard size={16} className="text-primary" /> Razorpay
+                                                        </div>
+                                                        {paymentMethod === 'razorpay' && (
+                                                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                                        )}
                                                     </div>
-                                                    <p className="text-[11px] text-muted-foreground">UPI, Cards, NetBanking with auto-approval</p>
+                                                    <p className="text-[11px] text-muted-foreground leading-relaxed">UPI, Cards, NetBanking with auto-approval</p>
                                                 </button>
 
                                                 <button
                                                     type="button"
                                                     onClick={() => setPaymentMethod('test')}
-                                                    className={`p-4 rounded-xl border text-left transition-all ${
+                                                    className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden ${
                                                         paymentMethod === 'test'
-                                                            ? 'border-emerald-600 bg-emerald-500/5 ring-1 ring-emerald-600 shadow-xs'
-                                                            : 'border-border/60 hover:border-border'
+                                                            ? 'border-emerald-600 bg-emerald-500/5 ring-2 ring-emerald-600/25 shadow-sm'
+                                                            : 'border-border/60 hover:border-emerald-500/40 bg-white'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center gap-2 mb-1.5 font-bold text-xs text-emerald-800">
-                                                        <Sparkles size={15} className="text-emerald-600" /> Instant Test
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2 font-black text-xs text-emerald-800">
+                                                            <Sparkles size={16} className="text-emerald-600" /> Instant Test
+                                                        </div>
+                                                        {paymentMethod === 'test' && (
+                                                            <div className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                                                        )}
                                                     </div>
-                                                    <p className="text-[11px] text-muted-foreground">1-Click instant test checkout (Dev/Review mode)</p>
+                                                    <p className="text-[11px] text-muted-foreground leading-relaxed">1-Click instant test checkout (Dev/Review mode)</p>
                                                 </button>
 
                                                 <button
                                                     type="button"
                                                     onClick={() => setPaymentMethod('manual')}
-                                                    className={`p-4 rounded-xl border text-left transition-all ${
+                                                    className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden ${
                                                         paymentMethod === 'manual'
-                                                            ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-xs'
-                                                            : 'border-border/60 hover:border-border'
+                                                            ? 'border-primary bg-primary/5 ring-2 ring-primary/25 shadow-sm'
+                                                            : 'border-border/60 hover:border-primary/40 bg-white'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center gap-2 mb-1.5 font-bold text-xs text-foreground">
-                                                        <QrCode size={15} className="text-primary" /> Manual UPI QR
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2 font-black text-xs text-primary">
+                                                            <QrCode size={16} className="text-primary" /> Manual UPI QR
+                                                        </div>
+                                                        {paymentMethod === 'manual' && (
+                                                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                                        )}
                                                     </div>
-                                                    <p className="text-[11px] text-muted-foreground">Direct QR scan with manual UTR submission</p>
+                                                    <p className="text-[11px] text-muted-foreground leading-relaxed">Direct QR scan with manual UTR submission</p>
                                                 </button>
                                             </div>
                                         </div>
